@@ -1654,9 +1654,73 @@ body.dark-mode .profile-select-btn {
             background: var(--success);
             color: white;
         }
+
+        /* Real-time Sync Status Indicator */
+        .sync-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 25px;
+            background: var(--card-bg);
+            box-shadow: var(--shadow-md);
+            border: 2px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 0.9em;
+            z-index: 9999;
+            transition: var(--transition);
+        }
+
+        .sync-status-icon {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            transition: var(--transition);
+        }
+
+        .sync-status.connected .sync-status-icon {
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse-sync 2s infinite;
+        }
+
+        .sync-status.disconnected .sync-status-icon {
+            background: var(--danger);
+            box-shadow: 0 0 10px var(--danger);
+        }
+
+        .sync-status.syncing .sync-status-icon {
+            background: var(--warning);
+            box-shadow: 0 0 10px var(--warning);
+            animation: pulse-sync 0.5s infinite;
+        }
+
+        @keyframes pulse-sync {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.2);
+                opacity: 0.7;
+            }
+        }
+
+        .sync-status-text {
+            color: var(--text-color);
+        }
     </style>
 </head>
 <body class="theme-purple">
+    <!-- Real-time Sync Status Indicator -->
+    <div class="sync-status connected" id="syncStatus">
+        <div class="sync-status-icon"></div>
+        <span class="sync-status-text" id="syncStatusText">🔄 Synced</span>
+    </div>
+
     <div class="app-container">
         <!-- Top Navigation -->
         <div class="top-nav">
@@ -2804,6 +2868,47 @@ const firebaseConfig = {
 console.log('✅ Firebase initialized for app:', APP_NAME);
 console.log('📂 All data will be stored in:', APP_NAME + '/');
 
+// =================== REAL-TIME CONNECTION MONITORING ===================
+let isConnected = false;
+let syncStatusElement = null;
+let syncStatusTextElement = null;
+
+function updateSyncStatus(status, text) {
+    if (!syncStatusElement) {
+        syncStatusElement = document.getElementById('syncStatus');
+        syncStatusTextElement = document.getElementById('syncStatusText');
+    }
+    
+    if (syncStatusElement && syncStatusTextElement) {
+        syncStatusElement.className = 'sync-status ' + status;
+        syncStatusTextElement.textContent = text;
+    }
+}
+
+// Monitor Firebase connection state
+const connectedRef = database.ref('.info/connected');
+connectedRef.on('value', (snapshot) => {
+    isConnected = snapshot.val() === true;
+    
+    if (isConnected) {
+        console.log('🔄 Real-time sync: CONNECTED');
+        updateSyncStatus('connected', '🔄 Synced');
+    } else {
+        console.log('❌ Real-time sync: DISCONNECTED');
+        updateSyncStatus('disconnected', '❌ Offline');
+    }
+});
+
+// Show syncing indicator when data is being updated
+function showSyncingIndicator() {
+    updateSyncStatus('syncing', '⏳ Syncing...');
+    setTimeout(() => {
+        if (isConnected) {
+            updateSyncStatus('connected', '🔄 Synced');
+        }
+    }, 500);
+}
+
         // =================== DATA MANAGEMENT ===================
         let currentSession = null;
         let currentUsername = '';
@@ -3287,12 +3392,20 @@ getRef('subscriptionProducts').on('value', (snapshot) => {
         }
     });
 
-    // Load settings
-    getRef('settings/' + currentUsername).once('value').then((snapshot) => {
+    // Load settings with real-time sync
+    getRef('settings/' + currentUsername).on('value', (snapshot) => {
         if (snapshot.exists()) {
-            settings = snapshot.val();
+            const newSettings = snapshot.val();
+            // Only update and apply if settings actually changed
+            if (JSON.stringify(settings) !== JSON.stringify(newSettings)) {
+                console.log('⚙️ Settings updated in real-time');
+                settings = newSettings;
+                applySettings();
+            }
+        } else {
+            // Use default settings if none exist
+            applySettings();
         }
-        applySettings();
     });
     
     // Populate Sold By dropdown with real admin names
@@ -3321,9 +3434,9 @@ function populateSoldByDropdown() {
             settings.theme = document.getElementById('themeSelect').value;
             settings.lowStockThreshold = parseInt(document.getElementById('lowStockThreshold').value);
             
+            showSyncingIndicator();
             getRef('settings/' + currentUsername).set(settings)
                 .then(() => {
-                    applySettings();
                     showToast('✅ Settings saved!', 'success');
                     closeSettingsModal();
                 })
@@ -3455,6 +3568,7 @@ function autoCalculatePrices() {
                 createdDate: new Date().toISOString().split('T')[0]
             };
             
+            showSyncingIndicator();
             getRef('products/' + newProduct.id).set(newProduct)
                 .then(() => {
                     document.getElementById('addProductForm').reset();
@@ -3512,6 +3626,7 @@ sharedPrice: sharedPrice,
         createdAt: new Date().toISOString().split('T')[0]
     };
     
+    showSyncingIndicator();
     getRef('subscriptionProducts/' + newProduct.id).set(newProduct)
         .then(() => {
             document.getElementById('addSubscriptionForm').reset();
@@ -3932,6 +4047,7 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
                 updatedDate: new Date().toISOString().split('T')[0]
             };
             
+            showSyncingIndicator();
             getRef('products/' + productId).update(updatedProduct)
                 .then(() => {
                     closeEditProductModal();
@@ -4050,6 +4166,7 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
                 };
                 
                 const userKey = (soldByUser ? soldByUser.username : currentSession.username).replace(/[.#$/[\]]/g, '_');
+                showSyncingIndicator();
                 getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
                     .then(() => {
                         document.getElementById('addSaleForm').reset();
@@ -4108,6 +4225,7 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
                 };
                 
                 const userKey = currentSession.username.replace(/[.#$/[\]]/g, '_');
+                showSyncingIndicator();
                 getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
                     .then(() => {
                         document.getElementById('addSaleForm').reset();
@@ -4159,6 +4277,7 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
                 createdBy: currentSession.username
             };
             
+            showSyncingIndicator();
             getRef('accounts/' + accountId).set(newAccount)
                 .then(() => {
                     closeAccountManagementModal();
@@ -4268,6 +4387,7 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
         function deleteAccount(accountId) {
             if (!confirm('Delete this account? All associated sales will remain but references will be broken.')) return;
             
+            showSyncingIndicator();
             getRef('accounts/' + accountId).remove()
                 .then(() => {
                     showToast('🗑️ Account deleted', 'info');
@@ -4304,6 +4424,7 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
             sale.sold = !sale.sold;
             
             const userKey = sale.userName.replace(/[.#$/[\]]/g, '_');
+            showSyncingIndicator();
             getRef('sales/' + userKey + '/' + id).update({ sold: sale.sold })
                 .then(() => {
                     showToast(sale.sold ? '✅ Marked as sold!' : '📦 Marked as in stock', 'success');
@@ -4354,6 +4475,7 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
                         createdDate: new Date().toISOString().split('T')[0]
                     };
 
+                    showSyncingIndicator();
                     return getRef('users/' + username).set(newUser);
                 })
                 .then(() => {
@@ -4373,6 +4495,7 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
                 const user = users.find(u => u.id === userId);
                 if (!user) return;
                 
+                showSyncingIndicator();
                 getRef('users/' + user.username).remove()
                     .then(() => {
                         return getRef('payouts').orderByChild('userId').equalTo(userId).once('value');
@@ -4745,6 +4868,7 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
             };
             
             // Save history record
+            showSyncingIndicator();
             getRef('payoutHistory/' + historyRecord.id).set(historyRecord)
                 .then(() => {
                     // Update payout status to paid
@@ -4999,6 +5123,7 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
                     const currentIndex = themes.indexOf(settings.theme);
                     settings.theme = themes[(currentIndex + 1) % themes.length];
                     applySettings();
+                    showSyncingIndicator();
                     getRef('settings/' + currentUsername).set(settings);
                     showToast('🎨 Theme changed!', 'success');
                 });
@@ -5016,6 +5141,7 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
                 btnDark.addEventListener('click', () => {
                     settings.darkMode = !settings.darkMode;
                     applySettings();
+                    showSyncingIndicator();
                     getRef('settings/' + currentUsername).set(settings);
                     showToast(settings.darkMode ? '🌙 Dark mode enabled' : '☀️ Light mode enabled', 'info');
                 });
@@ -5026,6 +5152,7 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
                 toggleDarkMode.addEventListener('click', () => {
                     settings.darkMode = !settings.darkMode;
                     applySettings();
+                    showSyncingIndicator();
                     getRef('settings/' + currentUsername).set(settings);
                 });
             }
@@ -5089,6 +5216,7 @@ document.getElementById('addSaleForm').addEventListener('submit', function(e) {
             profile.soldBy = currentUsername;
             profile.soldDate = new Date().toISOString().split('T')[0];
             
+            showSyncingIndicator();
             getRef('subscriptionProducts/' + subProduct.id).set(subProduct)
                 .then(() => {
                     const newSale = {
@@ -5126,6 +5254,7 @@ totalPrice: subProduct.soloPrice,
                 profile.soldDate = new Date().toISOString().split('T')[0];
             });
             
+            showSyncingIndicator();
             getRef('subscriptionProducts/' + subProduct.id).set(subProduct)
                 .then(() => {
                     const newSale = {
@@ -5185,6 +5314,7 @@ totalPrice: subProduct.sharedPrice,
         };
         
         const userKey = currentUsername.replace(/[.#$[\]]/g, '_');
+        showSyncingIndicator();
         getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
             .then(() => {
                 document.getElementById('addSaleForm').reset();
@@ -5271,6 +5401,7 @@ totalPrice: subProduct.sharedPrice,
             };
 
             // Save to Firebase
+            showSyncingIndicator();
             getRef('settings/' + currentUsername + '/customTheme').set(customTheme)
                 .then(() => {
                     showToast('✅ Custom theme saved!', 'success');
