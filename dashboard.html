@@ -1728,7 +1728,10 @@ body.dark-mode .profile-select-btn {
                 <div class="user-avatar" id="userAvatar">A</div>
                 <div class="user-details">
                     <h3 id="userName">Adeebaabkhan</h3>
-                    <p><span class="user-role" id="userRole">👑 OWNER</span></p>
+                    <p>
+                        <span class="user-role" id="userRole">👑 OWNER</span>
+                        <span class="user-role" id="commissionModeBadge" style="margin-left: 10px; background: var(--gradient-cyan); display: none;">💰 Commission: Loading...</span>
+                    </p>
                 </div>
             </div>
             <div class="nav-actions">
@@ -3494,6 +3497,9 @@ getRef('subscriptionProducts').on('value', (snapshot) => {
                     loadCommissionSettings();
                 }
                 
+                // Update commission badge for all users
+                updateCommissionBadge();
+                
                 // Recalculate stats and update displays
                 calculateStats();
                 renderSalesTable();
@@ -3576,6 +3582,28 @@ function populateSoldByDropdown() {
                 
                 // Load current commission settings
                 loadCommissionSettings();
+            }
+            
+            // Update commission mode badge for all users
+            updateCommissionBadge();
+        }
+        
+        function updateCommissionBadge() {
+            const badge = document.getElementById('commissionModeBadge');
+            if (!badge) return;
+            
+            if (currentSession.role === 'admin') {
+                // Show commission mode for admins
+                badge.style.display = 'inline-block';
+                
+                if (commissionSettings.mode === 'flat') {
+                    badge.textContent = `💰 Commission: ${commissionSettings.flatRate}% Flat`;
+                } else {
+                    badge.textContent = `💰 Commission: Bracket-Based`;
+                }
+            } else {
+                // Don't show for owner
+                badge.style.display = 'none';
             }
         }
         
