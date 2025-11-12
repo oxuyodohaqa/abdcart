@@ -1728,7 +1728,10 @@ body.dark-mode .profile-select-btn {
                 <div class="user-avatar" id="userAvatar">A</div>
                 <div class="user-details">
                     <h3 id="userName">Adeebaabkhan</h3>
-                    <p><span class="user-role" id="userRole">👑 OWNER</span></p>
+                    <p>
+                        <span class="user-role" id="userRole">👑 OWNER</span>
+                        <span class="user-role" id="commissionModeBadge" style="margin-left: 10px; background: var(--gradient-cyan); display: none;">💰 Commission: Loading...</span>
+                    </p>
                 </div>
             </div>
             <div class="nav-actions">
@@ -2599,6 +2602,67 @@ body.dark-mode .profile-select-btn {
                 </div>
             </div>
             
+            <!-- Commission Settings (Owner Only) -->
+            <div id="commissionSettingsSection" style="margin-top: 30px; padding: 20px; background: var(--light); border-radius: 20px; border: 3px solid var(--primary); display: none;">
+                <h3 style="color: var(--primary); margin-bottom: 15px; font-weight: 800;">💰 Admin Commission Settings</h3>
+                <p style="margin-bottom: 15px; opacity: 0.8; font-size: 0.9em;">Configure how admin commissions are calculated globally</p>
+                
+                <div class="form-group">
+                    <label>📊 Commission Mode</label>
+                    <div class="warranty-options">
+                        <div class="warranty-option">
+                            <input type="radio" id="commissionModeFlat" name="commissionMode" value="flat" checked>
+                            <label class="warranty-label" for="commissionModeFlat">
+                                <span class="warranty-icon">💵</span>
+                                Flat Rate
+                            </label>
+                        </div>
+                        <div class="warranty-option">
+                            <input type="radio" id="commissionModeBracket" name="commissionMode" value="bracket">
+                            <label class="warranty-label" for="commissionModeBracket">
+                                <span class="warranty-icon">📊</span>
+                                Bracket-Based
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Flat Rate Configuration -->
+                <div id="flatRateConfig" style="margin-top: 20px;">
+                    <div class="form-group">
+                        <label>💵 Flat Rate Percentage (%)</label>
+                        <input type="number" id="flatRatePercent" placeholder="Enter percentage (e.g., 15)" min="0" max="100" step="0.1" value="15">
+                        <small style="display: block; margin-top: 5px; opacity: 0.7;">This percentage will be applied to all sales profit</small>
+                    </div>
+                </div>
+                
+                <!-- Bracket-Based Configuration -->
+                <div id="bracketConfig" style="margin-top: 20px; display: none;">
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-weight: 700; color: var(--primary);">📊 Commission Brackets</label>
+                        <small style="display: block; margin-top: 5px; opacity: 0.7;">Define profit ranges and their commission percentages</small>
+                    </div>
+                    
+                    <div id="bracketList" style="display: grid; gap: 10px; margin-bottom: 15px;">
+                        <!-- Brackets will be dynamically added here -->
+                    </div>
+                    
+                    <button class="btn btn-secondary" onclick="addCommissionBracket()" style="width: 100%;">
+                        ➕ Add Bracket
+                    </button>
+                </div>
+                
+                <div style="margin-top: 20px; padding: 15px; background: var(--card-bg); border-radius: 15px; border: 2px solid var(--info);">
+                    <h4 style="color: var(--info); margin-bottom: 10px; font-weight: 700;">ℹ️ How It Works</h4>
+                    <ul style="margin-left: 20px; opacity: 0.9; line-height: 1.8;">
+                        <li><strong>Flat Rate:</strong> Single percentage applied to all sales profit</li>
+                        <li><strong>Bracket-Based:</strong> Different percentages based on profit amount</li>
+                        <li>Changes sync instantly to all admin accounts</li>
+                        <li>Only one mode can be active at a time</li>
+                    </ul>
+                </div>
+            </div>
+
             <!-- Advanced Theme Builder -->
             <div style="margin-top: 30px; padding: 20px; background: var(--light); border-radius: 20px; border: 3px dashed var(--border-color);">
                 <h3 style="color: var(--primary); margin-bottom: 15px; font-weight: 800;">🎨 Custom Theme Builder</h3>
@@ -2924,6 +2988,18 @@ let realAdmins = []; // Store real admins from Firebase
             theme: 'theme-purple',
             darkMode: false,
             lowStockThreshold: 5
+        };
+        
+        // Commission settings global state
+        let commissionSettings = {
+            mode: 'flat', // 'flat' or 'bracket'
+            flatRate: 15, // Default flat rate percentage
+            brackets: [
+                { minProfit: 0, maxProfit: 299, rate: 10 },
+                { minProfit: 300, maxProfit: 599, rate: 15 },
+                { minProfit: 600, maxProfit: 999, rate: 20 },
+                { minProfit: 1000, maxProfit: Infinity, rate: 25 }
+            ]
         };
 
         let calcValue = '0';
@@ -3408,6 +3484,36 @@ getRef('subscriptionProducts').on('value', (snapshot) => {
         }
     });
     
+    // Load commission settings with real-time sync (global for all users)
+    getRef('commissionSettings').on('value', (snapshot) => {
+        if (snapshot.exists()) {
+            const newCommissionSettings = snapshot.val();
+            if (JSON.stringify(commissionSettings) !== JSON.stringify(newCommissionSettings)) {
+                console.log('💰 Commission settings updated in real-time');
+                commissionSettings = newCommissionSettings;
+                
+                // Update UI if commission settings section is visible
+                if (currentSession.role === 'owner') {
+                    loadCommissionSettings();
+                }
+                
+                // Update commission badge for all users
+                updateCommissionBadge();
+                
+                // Recalculate stats and update displays
+                calculateStats();
+                renderSalesTable();
+                
+                showToast('💰 Commission settings updated!', 'info');
+            }
+        } else {
+            console.log('💰 Using default commission settings');
+        }
+    });
+    
+    // Initialize commission settings UI
+    initializeCommissionSettings();
+    
     // Populate Sold By dropdown with real admin names
     populateSoldByDropdown();
 }
@@ -3434,6 +3540,11 @@ function populateSoldByDropdown() {
             settings.theme = document.getElementById('themeSelect').value;
             settings.lowStockThreshold = parseInt(document.getElementById('lowStockThreshold').value);
             
+            // Save commission settings if owner
+            if (currentSession.role === 'owner') {
+                saveCommissionSettings();
+            }
+            
             showSyncingIndicator();
             getRef('settings/' + currentUsername).set(settings)
                 .then(() => {
@@ -3453,6 +3564,236 @@ function populateSoldByDropdown() {
             
             document.getElementById('themeSelect').value = settings.theme;
             document.getElementById('lowStockThreshold').value = settings.lowStockThreshold;
+        }
+
+        // =================== COMMISSION SETTINGS MANAGEMENT ===================
+        
+        function initializeCommissionSettings() {
+            // Show commission settings section only for owner
+            if (currentSession && currentSession.role === 'owner') {
+                document.getElementById('commissionSettingsSection').style.display = 'block';
+                
+                // Setup mode change listeners
+                document.querySelectorAll('input[name="commissionMode"]').forEach(radio => {
+                    radio.addEventListener('change', function() {
+                        toggleCommissionMode(this.value);
+                    });
+                });
+                
+                // Load current commission settings
+                loadCommissionSettings();
+            }
+            
+            // Update commission mode badge for all users
+            updateCommissionBadge();
+        }
+        
+        function updateCommissionBadge() {
+            const badge = document.getElementById('commissionModeBadge');
+            if (!badge) return;
+            
+            if (currentSession.role === 'admin') {
+                // Show commission mode for admins
+                badge.style.display = 'inline-block';
+                
+                if (commissionSettings.mode === 'flat') {
+                    badge.textContent = `💰 Commission: ${commissionSettings.flatRate}% Flat`;
+                } else {
+                    badge.textContent = `💰 Commission: Bracket-Based`;
+                }
+            } else {
+                // Don't show for owner
+                badge.style.display = 'none';
+            }
+        }
+        
+        function toggleCommissionMode(mode) {
+            const flatConfig = document.getElementById('flatRateConfig');
+            const bracketConfig = document.getElementById('bracketConfig');
+            
+            if (mode === 'flat') {
+                flatConfig.style.display = 'block';
+                bracketConfig.style.display = 'none';
+            } else {
+                flatConfig.style.display = 'none';
+                bracketConfig.style.display = 'block';
+            }
+        }
+        
+        function loadCommissionSettings() {
+            // Set mode radio buttons
+            document.getElementById('commissionModeFlat').checked = commissionSettings.mode === 'flat';
+            document.getElementById('commissionModeBracket').checked = commissionSettings.mode === 'bracket';
+            
+            // Set flat rate value
+            document.getElementById('flatRatePercent').value = commissionSettings.flatRate;
+            
+            // Load brackets
+            renderCommissionBrackets();
+            
+            // Show appropriate config section
+            toggleCommissionMode(commissionSettings.mode);
+        }
+        
+        function renderCommissionBrackets() {
+            const bracketList = document.getElementById('bracketList');
+            
+            if (!commissionSettings.brackets || commissionSettings.brackets.length === 0) {
+                bracketList.innerHTML = '<p style="opacity: 0.6;">No brackets defined. Click "Add Bracket" to create one.</p>';
+                return;
+            }
+            
+            bracketList.innerHTML = commissionSettings.brackets.map((bracket, index) => {
+                const maxDisplay = bracket.maxProfit === Infinity ? '∞' : bracket.maxProfit;
+                return `
+                    <div style="background: var(--card-bg); padding: 15px; border-radius: 15px; border: 2px solid var(--border-color); display: flex; gap: 10px; align-items: center;">
+                        <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                            <div>
+                                <label style="font-size: 0.8em; opacity: 0.7; display: block; margin-bottom: 5px;">Min Profit (₱)</label>
+                                <input type="number" id="bracketMin${index}" value="${bracket.minProfit}" min="0" step="0.01" 
+                                    onchange="updateBracket(${index}, 'minProfit', this.value)"
+                                    style="width: 100%; padding: 8px; border-radius: 10px; border: 2px solid var(--border-color);">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.8em; opacity: 0.7; display: block; margin-bottom: 5px;">Max Profit (₱)</label>
+                                <input type="number" id="bracketMax${index}" value="${bracket.maxProfit === Infinity ? '' : bracket.maxProfit}" 
+                                    min="0" step="0.01" placeholder="∞"
+                                    onchange="updateBracket(${index}, 'maxProfit', this.value)"
+                                    style="width: 100%; padding: 8px; border-radius: 10px; border: 2px solid var(--border-color);">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.8em; opacity: 0.7; display: block; margin-bottom: 5px;">Rate (%)</label>
+                                <input type="number" id="bracketRate${index}" value="${bracket.rate}" min="0" max="100" step="0.1"
+                                    onchange="updateBracket(${index}, 'rate', this.value)"
+                                    style="width: 100%; padding: 8px; border-radius: 10px; border: 2px solid var(--border-color);">
+                            </div>
+                        </div>
+                        <button onclick="removeBracket(${index})" style="padding: 10px 15px; background: var(--danger); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 700;">
+                            🗑️
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function addCommissionBracket() {
+            const lastBracket = commissionSettings.brackets[commissionSettings.brackets.length - 1];
+            const newMinProfit = lastBracket ? (lastBracket.maxProfit === Infinity ? lastBracket.minProfit + 100 : lastBracket.maxProfit + 1) : 0;
+            
+            commissionSettings.brackets.push({
+                minProfit: newMinProfit,
+                maxProfit: newMinProfit + 299,
+                rate: 10
+            });
+            
+            renderCommissionBrackets();
+        }
+        
+        function removeBracket(index) {
+            if (commissionSettings.brackets.length <= 1) {
+                showToast('⚠️ You must have at least one bracket!', 'error');
+                return;
+            }
+            
+            commissionSettings.brackets.splice(index, 1);
+            renderCommissionBrackets();
+        }
+        
+        function updateBracket(index, field, value) {
+            if (field === 'maxProfit') {
+                commissionSettings.brackets[index][field] = value === '' ? Infinity : parseFloat(value);
+            } else {
+                commissionSettings.brackets[index][field] = parseFloat(value);
+            }
+        }
+        
+        function saveCommissionSettings() {
+            if (currentSession.role !== 'owner') {
+                showToast('❌ Only owner can modify commission settings!', 'error');
+                return;
+            }
+            
+            // Get current mode
+            const mode = document.querySelector('input[name="commissionMode"]:checked').value;
+            
+            // Get flat rate if applicable
+            const flatRate = parseFloat(document.getElementById('flatRatePercent').value) || 15;
+            
+            // Validate flat rate
+            if (mode === 'flat' && (flatRate < 0 || flatRate > 100)) {
+                showToast('❌ Flat rate must be between 0 and 100!', 'error');
+                return;
+            }
+            
+            // Validate brackets if applicable
+            if (mode === 'bracket') {
+                if (commissionSettings.brackets.length === 0) {
+                    showToast('❌ Please add at least one bracket!', 'error');
+                    return;
+                }
+                
+                // Validate each bracket
+                for (let i = 0; i < commissionSettings.brackets.length; i++) {
+                    const bracket = commissionSettings.brackets[i];
+                    if (bracket.minProfit < 0 || bracket.rate < 0 || bracket.rate > 100) {
+                        showToast(`❌ Invalid values in bracket ${i + 1}!`, 'error');
+                        return;
+                    }
+                    if (bracket.maxProfit !== Infinity && bracket.maxProfit <= bracket.minProfit) {
+                        showToast(`❌ Max profit must be greater than min profit in bracket ${i + 1}!`, 'error');
+                        return;
+                    }
+                }
+                
+                // Sort brackets by minProfit
+                commissionSettings.brackets.sort((a, b) => a.minProfit - b.minProfit);
+            }
+            
+            // Update commission settings
+            commissionSettings.mode = mode;
+            commissionSettings.flatRate = flatRate;
+            
+            // Save to Firebase
+            showSyncingIndicator();
+            getRef('commissionSettings').set(commissionSettings)
+                .then(() => {
+                    showToast('✅ Commission settings saved and synced to all admins!', 'success');
+                })
+                .catch((error) => {
+                    showToast('❌ Error saving commission settings: ' + error.message, 'error');
+                });
+        }
+        
+        function calculateCommission(profit) {
+            if (commissionSettings.mode === 'flat') {
+                return (profit * commissionSettings.flatRate) / 100;
+            } else {
+                // Bracket-based calculation
+                for (const bracket of commissionSettings.brackets) {
+                    if (profit >= bracket.minProfit && profit <= bracket.maxProfit) {
+                        return (profit * bracket.rate) / 100;
+                    }
+                }
+                // If no bracket matches, use the last bracket's rate
+                const lastBracket = commissionSettings.brackets[commissionSettings.brackets.length - 1];
+                return (profit * lastBracket.rate) / 100;
+            }
+        }
+        
+        function getCommissionRate(profit) {
+            if (commissionSettings.mode === 'flat') {
+                return commissionSettings.flatRate;
+            } else {
+                // Bracket-based rate lookup
+                for (const bracket of commissionSettings.brackets) {
+                    if (profit >= bracket.minProfit && profit <= bracket.maxProfit) {
+                        return bracket.rate;
+                    }
+                }
+                // If no bracket matches, use the last bracket's rate
+                const lastBracket = commissionSettings.brackets[commissionSettings.brackets.length - 1];
+                return lastBracket.rate;
+            }
         }
 
         // =================== PRODUCT MANAGEMENT ===================
@@ -3504,7 +3845,7 @@ function autoCalculatePrices() {
     document.getElementById('autoProfitPercent').textContent = `${marginPercent}%`;
     document.getElementById('newMargin').value = marginPercent;
     
-    // Display real admin commissions
+    // Display admin commissions using new global commission settings
     const adminCommissionsList = document.getElementById('adminCommissionsList');
     if (realAdmins.length === 0) {
         adminCommissionsList.innerHTML = `
@@ -3514,16 +3855,30 @@ function autoCalculatePrices() {
             </div>
         `;
     } else {
-        adminCommissionsList.innerHTML = realAdmins.map(admin => {
-            const adminCommission = totalProfit * (admin.commission / 100);
+        // Show commission mode info first
+        const modeInfo = commissionSettings.mode === 'flat' 
+            ? `Flat Rate: ${commissionSettings.flatRate}%`
+            : `Bracket-Based`;
+        
+        let commissionsHTML = `
+            <div class="price-info-row" style="background: var(--primary); color: white; padding: 10px; border-radius: 10px; margin-bottom: 10px;">
+                <span class="price-info-label">💰 Mode: ${modeInfo}</span>
+                <span class="price-info-value">Rate: ${getCommissionRate(totalProfit).toFixed(1)}%</span>
+            </div>
+        `;
+        
+        commissionsHTML += realAdmins.map(admin => {
+            const adminCommission = calculateCommission(totalProfit);
             const ownerProfit = totalProfit - adminCommission;
             return `
                 <div class="price-info-row">
-                    <span class="price-info-label">👤 ${admin.username} (${admin.commission}%)</span>
+                    <span class="price-info-label">👤 ${admin.username}</span>
                     <span class="price-info-value">${admin.username}: ₱${adminCommission.toFixed(2)} | You: ₱${ownerProfit.toFixed(2)}</span>
                 </div>
             `;
         }).join('');
+        
+        adminCommissionsList.innerHTML = commissionsHTML;
     }
     
     // Show the calculation card
@@ -3938,20 +4293,31 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
             const sellPrice = product.sellPrice;
             const margin = product.margin;
             
-            // Calculate user's commission - FIXED: Calculate from PROFIT not SELL PRICE
-            const userCommissionPercent = currentSession.profitPercent || 100; // Owner gets 100%
-            const actualProfit = sellPrice - buyPrice; // Calculate profit FIRST
-            const commissionPerUnit = (actualProfit * userCommissionPercent) / 100; // Commission from PROFIT
+            // Calculate profit
+            const actualProfit = sellPrice - buyPrice;
+            
+            // Calculate user's commission using the new global commission settings
+            let commissionPerUnit;
+            if (currentSession.role === 'owner') {
+                // Owner gets full profit
+                commissionPerUnit = actualProfit;
+            } else {
+                // Admin gets commission based on global settings (flat rate or bracket-based)
+                commissionPerUnit = calculateCommission(actualProfit);
+            }
             
             // Display price (what user pays)
             const userPrice = currentSession.role === 'owner' ? sellPrice : (sellPrice - commissionPerUnit);
             
             // Commission amount (what user earns)
-            const yourCommission = currentSession.role === 'owner' ? actualProfit : commissionPerUnit;
+            const yourCommission = commissionPerUnit;
+            
+            // Get commission rate for display
+            const commissionRate = currentSession.role === 'owner' ? 100 : getCommissionRate(actualProfit);
             
             // Update single unit display
             document.getElementById('productPrice').textContent = '₱' + userPrice.toFixed(2);
-            document.getElementById('productMargin').textContent = margin.toFixed(2) + '%';
+            document.getElementById('productMargin').textContent = margin.toFixed(2) + '% | Commission: ' + commissionRate.toFixed(1) + '%';
             document.getElementById('productCommission').textContent = '₱' + yourCommission.toFixed(2);
             document.getElementById('productDetailsCard').style.display = 'block';
             
@@ -4131,11 +4497,18 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
                 const quantity = 1; // Always 1 for profile sales
                 const price = parseFloat(document.getElementById('productPrice').textContent.replace('₱', ''));
                 
-                // Calculate commission based on sold by admin
+                // Calculate commission based on sold by admin using new global commission settings
                 const soldByUser = users.find(u => u.username === soldBy);
-                const userCommissionPercent = soldByUser ? soldByUser.profitPercent : (currentSession.profitPercent || 100);
                 const actualProfit = product.sellPrice - product.buyPrice;
-                const commissionAmount = (actualProfit * userCommissionPercent) / 100;
+                
+                let commissionAmount;
+                if (soldByUser && soldByUser.role === 'owner') {
+                    commissionAmount = actualProfit; // Owner gets full profit
+                } else {
+                    // Use global commission settings for admins
+                    commissionAmount = calculateCommission(actualProfit);
+                }
+                
                 const ownerProfit = actualProfit - commissionAmount;
                 
                 const newSale = {
@@ -4199,11 +4572,16 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
                 const quantity = parseInt(document.getElementById('productQuantity').value);
                 const price = parseFloat(document.getElementById('productPrice').textContent.replace('₱', ''));
                 
-                // USE ADMIN'S PROFIT PERCENT FROM THEIR ACCOUNT - FIXED CALCULATION
-                const userCommissionPercent = currentSession.profitPercent || 100;
-                const actualProfit = product.sellPrice - product.buyPrice; // Calculate profit FIRST
-                const commissionAmount = (actualProfit * userCommissionPercent) / 100; // Commission from PROFIT
-                const yourProfit = currentSession.role === 'owner' ? actualProfit : commissionAmount;
+                // Calculate commission using new global commission settings
+                const actualProfit = product.sellPrice - product.buyPrice;
+                
+                let yourProfit;
+                if (currentSession.role === 'owner') {
+                    yourProfit = actualProfit; // Owner gets full profit
+                } else {
+                    // Use global commission settings for admins
+                    yourProfit = calculateCommission(actualProfit);
+                }
                 
                 const newSale = {
                     id: Date.now(),
