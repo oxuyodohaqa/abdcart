@@ -2465,6 +2465,22 @@ body.dark-mode .profile-select-btn {
                 </form>
             </div>
 
+            <!-- Commission Bracket Configuration -->
+            <div class="section-title" style="margin-top: 30px;">📊 Commission Bracket System</div>
+            <div class="form-section" style="border: none; box-shadow: none; padding: 0;">
+                <p style="margin-bottom: 15px; color: var(--text-color); opacity: 0.8;">
+                    💡 Set commission rates based on profit ranges. Higher profits = higher commission rates.
+                </p>
+                
+                <div id="commissionBracketsList" style="margin-bottom: 15px;">
+                    <!-- Brackets will be dynamically rendered here -->
+                </div>
+                
+                <button class="btn btn-info" onclick="openAddBracketModal()" style="width: auto; padding: 10px 20px;">
+                    ➕ Add Bracket
+                </button>
+            </div>
+
             <div class="section-title" style="margin-top: 30px;">📋 Admin List</div>
             <div class="user-list" id="userList"></div>
 
@@ -2479,6 +2495,44 @@ body.dark-mode .profile-select-btn {
             </div>
 
             <div class="payout-list" id="payoutList"></div>
+        </div>
+    </div>
+
+    <!-- Commission Bracket Modal -->
+    <div class="modal" id="commissionBracketModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📊 Add Commission Bracket</h2>
+                <button class="close-btn" onclick="closeCommissionBracketModal()">✕</button>
+            </div>
+            
+            <form id="addBracketForm">
+                <div class="form-group">
+                    <label>💵 Minimum Profit (₱)</label>
+                    <input type="number" id="bracketMinProfit" placeholder="e.g., 0, 300, 600" min="0" step="0.01" required>
+                    <small style="color: var(--text-color); opacity: 0.7; display: block; margin-top: 5px;">
+                        💡 Starting profit amount for this bracket
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label>💵 Maximum Profit (₱)</label>
+                    <input type="number" id="bracketMaxProfit" placeholder="e.g., 299.99, 599.99, 999.99" min="0" step="0.01">
+                    <small style="color: var(--text-color); opacity: 0.7; display: block; margin-top: 5px;">
+                        💡 Leave empty for "and above" (e.g., ₱1000+)
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label>📊 Commission Rate (%)</label>
+                    <input type="number" id="bracketRate" placeholder="e.g., 10, 15, 20" min="0" max="100" step="0.1" required>
+                    <small style="color: var(--text-color); opacity: 0.7; display: block; margin-top: 5px;">
+                        💡 Commission percentage for this profit range
+                    </small>
+                </div>
+                
+                <button type="submit" class="btn btn-success">➕ Add Bracket</button>
+            </form>
         </div>
     </div>
 
@@ -2920,6 +2974,7 @@ let subscriptionProducts = [];
 let accounts = []; // Store streaming service accounts
 let selectedProfile = null;
 let realAdmins = []; // Store real admins from Firebase
+let commissionBrackets = []; // Store commission bracket configuration
     let settings = {
             theme: 'theme-purple',
             darkMode: false,
@@ -3279,12 +3334,16 @@ function selectProfile(number) {
                 document.getElementById('btnProducts').style.display = 'inline-block';
                 document.getElementById('btnPayout').style.display = 'inline-block';
                 document.getElementById('inventoryDashboardSection').style.display = 'block';
+                // Load commission brackets for owner
+                loadCommissionBrackets();
             } else {
                 // Admins can also view/edit products
                 document.getElementById('btnProducts').style.display = 'inline-block';
                 document.getElementById('userFilter').style.display = 'none';
                 document.getElementById('adminColumn').style.display = 'none';
                 document.getElementById('dashboardSubtitle').textContent = currentSession.customName + "'s Dashboard";
+                // Load commission brackets for admins to use in calculations
+                loadCommissionBrackets();
             }
         }
 
@@ -3933,18 +3992,28 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
             
             const quantity = parseInt(document.getElementById('productQuantity').value) || 1;
             
-            // Calculate prices BASED ON CURRENT USER'S PROFIT PERCENT
+            // Calculate prices
             const buyPrice = product.buyPrice;
             const sellPrice = product.sellPrice;
             const margin = product.margin;
             
-            // Calculate user's commission - FIXED: Calculate from PROFIT not SELL PRICE
-            const userCommissionPercent = currentSession.profitPercent || 100; // Owner gets 100%
-            const actualProfit = sellPrice - buyPrice; // Calculate profit FIRST
-            const commissionPerUnit = (actualProfit * userCommissionPercent) / 100; // Commission from PROFIT
+            // Calculate profit first: Profit = Sales - Capital
+            const actualProfit = sellPrice - buyPrice;
             
-            // Display price (what user pays)
-            const userPrice = currentSession.role === 'owner' ? sellPrice : (sellPrice - commissionPerUnit);
+            // Get commission rate based on brackets (for admins) or use 100% for owner
+            let userCommissionPercent;
+            if (currentSession.role === 'owner') {
+                userCommissionPercent = 100; // Owner gets 100% of profit
+            } else {
+                // For admins, use bracket-based commission or fallback to profitPercent
+                userCommissionPercent = getCommissionRateForProfit(actualProfit);
+            }
+            
+            // Calculate commission: Salary = Profit × Rate (%)
+            const commissionPerUnit = (actualProfit * userCommissionPercent) / 100;
+            
+            // Display price (what customer pays)
+            const userPrice = sellPrice;
             
             // Commission amount (what user earns)
             const yourCommission = currentSession.role === 'owner' ? actualProfit : commissionPerUnit;
@@ -3952,7 +4021,7 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
             // Update single unit display
             document.getElementById('productPrice').textContent = '₱' + userPrice.toFixed(2);
             document.getElementById('productMargin').textContent = margin.toFixed(2) + '%';
-            document.getElementById('productCommission').textContent = '₱' + yourCommission.toFixed(2);
+            document.getElementById('productCommission').textContent = '₱' + yourCommission.toFixed(2) + ' (' + userCommissionPercent.toFixed(1) + '%)';
             document.getElementById('productDetailsCard').style.display = 'block';
             
             // Update total earnings
@@ -3966,6 +4035,12 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
 
         // Delete Product
         function deleteProduct(productId) {
+            // Prevent admins from deleting products
+            if (currentSession.role !== 'owner') {
+                showToast('❌ Only owner can delete products', 'error');
+                return;
+            }
+            
             if (!confirm('Delete this product?')) return;
             
             getRef('products/' + productId).remove()
@@ -3979,6 +4054,12 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
 
         // Edit Product
         function editProduct(productId) {
+            // Prevent admins from editing products
+            if (currentSession.role !== 'owner') {
+                showToast('❌ Only owner can edit product prices and rates', 'error');
+                return;
+            }
+            
             const product = products.find(p => p.id === productId);
             if (!product) return;
             
@@ -4133,8 +4214,14 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
                 
                 // Calculate commission based on sold by admin
                 const soldByUser = users.find(u => u.username === soldBy);
-                const userCommissionPercent = soldByUser ? soldByUser.profitPercent : (currentSession.profitPercent || 100);
                 const actualProfit = product.sellPrice - product.buyPrice;
+                // Use bracket-based commission for admins
+                let userCommissionPercent;
+                if (soldByUser) {
+                    userCommissionPercent = currentSession.role === 'owner' ? getCommissionRateForProfit(actualProfit) : soldByUser.profitPercent;
+                } else {
+                    userCommissionPercent = currentSession.role === 'owner' ? 100 : getCommissionRateForProfit(actualProfit);
+                }
                 const commissionAmount = (actualProfit * userCommissionPercent) / 100;
                 const ownerProfit = actualProfit - commissionAmount;
                 
@@ -4199,10 +4286,14 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
                 const quantity = parseInt(document.getElementById('productQuantity').value);
                 const price = parseFloat(document.getElementById('productPrice').textContent.replace('₱', ''));
                 
-                // USE ADMIN'S PROFIT PERCENT FROM THEIR ACCOUNT - FIXED CALCULATION
-                const userCommissionPercent = currentSession.profitPercent || 100;
-                const actualProfit = product.sellPrice - product.buyPrice; // Calculate profit FIRST
-                const commissionAmount = (actualProfit * userCommissionPercent) / 100; // Commission from PROFIT
+                // Calculate profit first: Profit = Sales - Capital
+                const actualProfit = product.sellPrice - product.buyPrice;
+                
+                // Use bracket-based commission for admins or 100% for owner
+                const userCommissionPercent = currentSession.role === 'owner' ? 100 : getCommissionRateForProfit(actualProfit);
+                
+                // Calculate salary: Salary = Profit × Rate (%)
+                const commissionAmount = (actualProfit * userCommissionPercent) / 100;
                 const yourProfit = currentSession.role === 'owner' ? actualProfit : commissionAmount;
                 
                 const newSale = {
@@ -5325,6 +5416,168 @@ totalPrice: subProduct.sharedPrice,
             });
     }
 });
+        // =================== COMMISSION BRACKET FUNCTIONS ===================
+        
+        // Load commission brackets
+        function loadCommissionBrackets() {
+            getRef('settings/' + currentUsername + '/commissionBrackets').on('value', (snapshot) => {
+                if (snapshot.exists()) {
+                    commissionBrackets = snapshot.val();
+                    // Convert object to array and sort by minProfit
+                    if (!Array.isArray(commissionBrackets)) {
+                        commissionBrackets = Object.values(commissionBrackets);
+                    }
+                    commissionBrackets.sort((a, b) => a.minProfit - b.minProfit);
+                } else {
+                    // Set default brackets if none exist
+                    commissionBrackets = [
+                        { id: 1, minProfit: 0, maxProfit: 299.99, rate: 10 },
+                        { id: 2, minProfit: 300, maxProfit: 599.99, rate: 15 },
+                        { id: 3, minProfit: 600, maxProfit: 999.99, rate: 20 },
+                        { id: 4, minProfit: 1000, maxProfit: null, rate: 25 }
+                    ];
+                    // Save defaults
+                    if (currentSession.role === 'owner') {
+                        saveCommissionBrackets();
+                    }
+                }
+                renderCommissionBrackets();
+            });
+        }
+        
+        // Calculate commission rate based on profit and brackets
+        function getCommissionRateForProfit(profit) {
+            // If brackets system is disabled or empty, use admin's default profitPercent
+            if (!commissionBrackets || commissionBrackets.length === 0) {
+                return currentSession.profitPercent || 25;
+            }
+            
+            // Find applicable bracket
+            for (let bracket of commissionBrackets) {
+                const min = bracket.minProfit || 0;
+                const max = bracket.maxProfit;
+                
+                if (max === null || max === undefined) {
+                    // This is the "and above" bracket
+                    if (profit >= min) {
+                        return bracket.rate;
+                    }
+                } else {
+                    // Standard bracket with min and max
+                    if (profit >= min && profit <= max) {
+                        return bracket.rate;
+                    }
+                }
+            }
+            
+            // Fallback to default if no bracket matches
+            return currentSession.profitPercent || 25;
+        }
+        
+        // Render commission brackets list
+        function renderCommissionBrackets() {
+            const list = document.getElementById('commissionBracketsList');
+            if (!list) return;
+            
+            if (commissionBrackets.length === 0) {
+                list.innerHTML = '<p style="color: var(--text-color); opacity: 0.6;">No brackets configured yet</p>';
+                return;
+            }
+            
+            list.innerHTML = commissionBrackets.map(bracket => {
+                const maxDisplay = bracket.maxProfit !== null && bracket.maxProfit !== undefined 
+                    ? `₱${bracket.maxProfit.toFixed(2)}` 
+                    : 'and above';
+                return `
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px; background: var(--light); border-radius: 10px; margin-bottom: 10px;">
+                        <div>
+                            <strong>₱${bracket.minProfit.toFixed(2)} - ${maxDisplay}</strong>
+                            <span style="margin-left: 15px; color: var(--primary); font-weight: 600;">
+                                ${bracket.rate}% commission
+                            </span>
+                        </div>
+                        <button class="action-btn delete-btn" onclick="deleteBracket(${bracket.id})" ${currentSession.role !== 'owner' ? 'disabled' : ''}>
+                            🗑️
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Open bracket modal
+        function openAddBracketModal() {
+            if (currentSession.role !== 'owner') {
+                showToast('❌ Only owner can configure brackets', 'error');
+                return;
+            }
+            document.getElementById('commissionBracketModal').classList.add('show');
+        }
+        
+        // Close bracket modal
+        function closeCommissionBracketModal() {
+            document.getElementById('commissionBracketModal').classList.remove('show');
+            document.getElementById('addBracketForm').reset();
+        }
+        
+        // Add bracket form handler
+        document.getElementById('addBracketForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            if (currentSession.role !== 'owner') {
+                showToast('❌ Only owner can add brackets', 'error');
+                return;
+            }
+            
+            const minProfit = parseFloat(document.getElementById('bracketMinProfit').value);
+            const maxProfitInput = document.getElementById('bracketMaxProfit').value;
+            const maxProfit = maxProfitInput ? parseFloat(maxProfitInput) : null;
+            const rate = parseFloat(document.getElementById('bracketRate').value);
+            
+            if (maxProfit !== null && minProfit >= maxProfit) {
+                showToast('⚠️ Maximum profit must be greater than minimum', 'error');
+                return;
+            }
+            
+            const newBracket = {
+                id: Date.now(),
+                minProfit: minProfit,
+                maxProfit: maxProfit,
+                rate: rate
+            };
+            
+            commissionBrackets.push(newBracket);
+            commissionBrackets.sort((a, b) => a.minProfit - b.minProfit);
+            
+            saveCommissionBrackets();
+            closeCommissionBracketModal();
+            showToast('✅ Bracket added successfully!', 'success');
+        });
+        
+        // Save brackets to Firebase
+        function saveCommissionBrackets() {
+            if (currentSession.role !== 'owner') return;
+            
+            showSyncingIndicator();
+            getRef('settings/' + currentUsername + '/commissionBrackets').set(commissionBrackets)
+                .catch((error) => {
+                    showToast('❌ Error saving brackets: ' + error.message, 'error');
+                });
+        }
+        
+        // Delete bracket
+        function deleteBracket(bracketId) {
+            if (currentSession.role !== 'owner') {
+                showToast('❌ Only owner can delete brackets', 'error');
+                return;
+            }
+            
+            if (!confirm('Delete this bracket?')) return;
+            
+            commissionBrackets = commissionBrackets.filter(b => b.id !== bracketId);
+            saveCommissionBrackets();
+            showToast('🗑️ Bracket deleted', 'info');
+        }
+        
         // =================== MODAL FUNCTIONS ===================
         function closeUserModal() {
             document.getElementById('userModal').classList.remove('show');
