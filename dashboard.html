@@ -4217,9 +4217,11 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
                 const actualProfit = product.sellPrice - product.buyPrice;
                 // Use bracket-based commission for admins
                 let userCommissionPercent;
-                if (soldByUser) {
-                    userCommissionPercent = currentSession.role === 'owner' ? getCommissionRateForProfit(actualProfit) : soldByUser.profitPercent;
+                if (soldByUser && soldByUser.role === 'admin') {
+                    // For admins, use bracket-based commission
+                    userCommissionPercent = getCommissionRateForProfit(actualProfit);
                 } else {
+                    // For owner or unknown user, use 100% or current session
                     userCommissionPercent = currentSession.role === 'owner' ? 100 : getCommissionRateForProfit(actualProfit);
                 }
                 const commissionAmount = (actualProfit * userCommissionPercent) / 100;
@@ -4893,19 +4895,19 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
                 const defaultCommission = userSales.filter(s => !s.customCommission).reduce((sum, s) => sum + ((s.commission || 0) * s.quantity), 0);
                 const customCommissionTotal = userSales.filter(s => s.customCommission).reduce((sum, s) => sum + ((s.commission || 0) * s.quantity), 0);
                 
+                // Calculate average commission rate for display
+                const avgRate = totalProfit > 0 ? ((commission / totalProfit) * 100).toFixed(1) : 0;
+                
                 return `
                     <div class="payout-item ${payout.status}">
                         <div class="payout-info" style="flex: 1;">
-                            <div class="payout-admin">👤 ${user.customName} (${user.profitPercent}% default)</div>
+                            <div class="payout-admin">👤 ${user.customName}</div>
                             <div class="payout-details">
-                                Sales: ${salesCount} items | Profit Generated: ₱${totalProfit.toFixed(2)}
+                                Sales: ${salesCount} items | Profit Generated: ₱${totalProfit.toFixed(2)} | Avg Rate: ${avgRate}%
                             </div>
-                            ${customCommissionTotal > 0 ? `
-                                <div class="payout-breakdown">
-                                    Default (${user.profitPercent}%): ₱${defaultCommission.toFixed(2)} | 
-                                    Custom: ₱${customCommissionTotal.toFixed(2)}
-                                </div>
-                            ` : ''}
+                            <div class="payout-breakdown" style="font-size: 0.85em; color: var(--text-color); opacity: 0.7; margin-top: 5px;">
+                                💡 Commission calculated using bracket system based on profit ranges
+                            </div>
                         </div>
                         <div class="payout-amount">💰 ₱${commission.toFixed(2)}</div>
                         <span class="payout-status ${payout.status}">${payout.status}</span>
