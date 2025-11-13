@@ -4805,32 +4805,39 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
         function calculateStats() {
             const filtered = getFilteredSales();
             
-            const totalSales = filtered.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
-            const totalProducts = filtered.reduce((sum, s) => sum + s.quantity, 0);
-            const soldCount = filtered.filter(s => s.sold).reduce((sum, s) => sum + s.quantity, 0);
-            const stockCount = filtered.filter(s => !s.sold).reduce((sum, s) => sum + s.quantity, 0);
-            
-            // Calculate Total Profit (Business Profit: Sell Price - Buy Price) - Only for sold items
-            const totalProfit = filtered.reduce((sum, s) => {
-                if (!s.sold) return sum; // Only count sold items
-                const profit = ((s.price || 0) - (s.buyPrice || 0)) * s.quantity;
-                return sum + profit;
-            }, 0);
-            
-            // Calculate Total Salary (Commission earned by admin) - Only for sold items
-            const totalSalary = filtered.reduce((sum, s) => {
-                if (!s.sold) return sum; // Only count sold items
-                return sum + (s.totalCommission || 0);
-            }, 0);
+            // Calculate all metrics in a single pass for better performance
+            const stats = filtered.reduce((acc, s) => {
+                acc.totalSales += (s.totalPrice || 0);
+                acc.totalProducts += s.quantity;
+                
+                if (s.sold) {
+                    acc.soldCount += s.quantity;
+                    // Calculate business profit (Sell Price - Buy Price) for sold items
+                    acc.totalProfit += ((s.price || 0) - (s.buyPrice || 0)) * s.quantity;
+                    // Calculate commission earned for sold items
+                    acc.totalSalary += (s.totalCommission || 0);
+                } else {
+                    acc.stockCount += s.quantity;
+                }
+                
+                return acc;
+            }, {
+                totalSales: 0,
+                totalProducts: 0,
+                soldCount: 0,
+                stockCount: 0,
+                totalProfit: 0,
+                totalSalary: 0
+            });
             
             const adminCount = users.filter(u => u.role === 'admin').length;
             
-            document.getElementById('totalSales').textContent = '₱' + totalSales.toFixed(2);
-            document.getElementById('totalProducts').textContent = totalProducts;
-            document.getElementById('soldCount').textContent = soldCount;
-            document.getElementById('stockCount').textContent = stockCount;
-            document.getElementById('totalProfit').textContent = '₱' + totalProfit.toFixed(2);
-            document.getElementById('totalSalary').textContent = '₱' + totalSalary.toFixed(2);
+            document.getElementById('totalSales').textContent = '₱' + stats.totalSales.toFixed(2);
+            document.getElementById('totalProducts').textContent = stats.totalProducts;
+            document.getElementById('soldCount').textContent = stats.soldCount;
+            document.getElementById('stockCount').textContent = stats.stockCount;
+            document.getElementById('totalProfit').textContent = '₱' + stats.totalProfit.toFixed(2);
+            document.getElementById('totalSalary').textContent = '₱' + stats.totalSalary.toFixed(2);
             document.getElementById('adminCount').textContent = adminCount;
         }
 
