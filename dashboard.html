@@ -363,6 +363,7 @@
         .stat-card:nth-child(4) { background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%); }
         .stat-card:nth-child(5) { background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); }
         .stat-card:nth-child(6) { background: linear-gradient(135deg, #FFE4E6 0%, #FECDD3 100%); }
+        .stat-card:nth-child(7) { background: linear-gradient(135deg, #D1F4E0 0%, #A7F3B8 100%); }
 
         body.dark-mode .stat-card {
             background: var(--card-bg) !important;
@@ -1797,8 +1798,13 @@ body.dark-mode .profile-select-btn {
             </div>
             <div class="stat-card">
                 <div class="stat-icon">🎯</div>
-                <div class="stat-label">Your Profit</div>
+                <div class="stat-label">Total Profit</div>
                 <div class="stat-value" id="totalProfit">₱0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">💰</div>
+                <div class="stat-label">Total Salary</div>
+                <div class="stat-value" id="totalSalary">₱0</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">👥</div>
@@ -4799,18 +4805,39 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
         function calculateStats() {
             const filtered = getFilteredSales();
             
-            const totalSales = filtered.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
-            const totalProducts = filtered.reduce((sum, s) => sum + s.quantity, 0);
-            const soldCount = filtered.filter(s => s.sold).reduce((sum, s) => sum + s.quantity, 0);
-            const stockCount = filtered.filter(s => !s.sold).reduce((sum, s) => sum + s.quantity, 0);
-            const totalProfit = filtered.reduce((sum, s) => sum + (s.totalCommission || 0), 0);
+            // Calculate all metrics in a single pass for better performance
+            const stats = filtered.reduce((acc, s) => {
+                acc.totalSales += (s.totalPrice || 0);
+                acc.totalProducts += s.quantity;
+                
+                if (s.sold) {
+                    acc.soldCount += s.quantity;
+                    // Calculate business profit (Sell Price - Buy Price) for sold items
+                    acc.totalProfit += ((s.price || 0) - (s.buyPrice || 0)) * s.quantity;
+                    // Calculate commission earned for sold items
+                    acc.totalSalary += (s.totalCommission || 0);
+                } else {
+                    acc.stockCount += s.quantity;
+                }
+                
+                return acc;
+            }, {
+                totalSales: 0,
+                totalProducts: 0,
+                soldCount: 0,
+                stockCount: 0,
+                totalProfit: 0,
+                totalSalary: 0
+            });
+            
             const adminCount = users.filter(u => u.role === 'admin').length;
             
-            document.getElementById('totalSales').textContent = '₱' + totalSales.toFixed(2);
-            document.getElementById('totalProducts').textContent = totalProducts;
-            document.getElementById('soldCount').textContent = soldCount;
-            document.getElementById('stockCount').textContent = stockCount;
-            document.getElementById('totalProfit').textContent = '₱' + totalProfit.toFixed(2);
+            document.getElementById('totalSales').textContent = '₱' + stats.totalSales.toFixed(2);
+            document.getElementById('totalProducts').textContent = stats.totalProducts;
+            document.getElementById('soldCount').textContent = stats.soldCount;
+            document.getElementById('stockCount').textContent = stats.stockCount;
+            document.getElementById('totalProfit').textContent = '₱' + stats.totalProfit.toFixed(2);
+            document.getElementById('totalSalary').textContent = '₱' + stats.totalSalary.toFixed(2);
             document.getElementById('adminCount').textContent = adminCount;
         }
 
