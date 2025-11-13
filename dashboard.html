@@ -363,6 +363,7 @@
         .stat-card:nth-child(4) { background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%); }
         .stat-card:nth-child(5) { background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); }
         .stat-card:nth-child(6) { background: linear-gradient(135deg, #FFE4E6 0%, #FECDD3 100%); }
+        .stat-card:nth-child(7) { background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%); }
 
         body.dark-mode .stat-card {
             background: var(--card-bg) !important;
@@ -1797,8 +1798,13 @@ body.dark-mode .profile-select-btn {
             </div>
             <div class="stat-card">
                 <div class="stat-icon">🎯</div>
-                <div class="stat-label">Your Profit</div>
+                <div class="stat-label">Total Profit</div>
                 <div class="stat-value" id="totalProfit">₱0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">💰</div>
+                <div class="stat-label">Total Salary</div>
+                <div class="stat-value" id="totalSalary">₱0</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">👥</div>
@@ -4803,7 +4809,16 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
             const totalProducts = filtered.reduce((sum, s) => sum + s.quantity, 0);
             const soldCount = filtered.filter(s => s.sold).reduce((sum, s) => sum + s.quantity, 0);
             const stockCount = filtered.filter(s => !s.sold).reduce((sum, s) => sum + s.quantity, 0);
-            const totalProfit = filtered.reduce((sum, s) => sum + (s.totalCommission || 0), 0);
+            
+            // Calculate Total Profit (Business Profit: Sell Price - Buy Price)
+            const totalProfit = filtered.reduce((sum, s) => {
+                const profit = ((s.price || 0) - (s.buyPrice || 0)) * s.quantity;
+                return sum + profit;
+            }, 0);
+            
+            // Calculate Total Salary (Commission earned by admin)
+            const totalSalary = filtered.reduce((sum, s) => sum + (s.totalCommission || 0), 0);
+            
             const adminCount = users.filter(u => u.role === 'admin').length;
             
             document.getElementById('totalSales').textContent = '₱' + totalSales.toFixed(2);
@@ -4811,6 +4826,7 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
             document.getElementById('soldCount').textContent = soldCount;
             document.getElementById('stockCount').textContent = stockCount;
             document.getElementById('totalProfit').textContent = '₱' + totalProfit.toFixed(2);
+            document.getElementById('totalSalary').textContent = '₱' + totalSalary.toFixed(2);
             document.getElementById('adminCount').textContent = adminCount;
         }
 
