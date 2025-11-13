@@ -363,7 +363,7 @@
         .stat-card:nth-child(4) { background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%); }
         .stat-card:nth-child(5) { background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); }
         .stat-card:nth-child(6) { background: linear-gradient(135deg, #FFE4E6 0%, #FECDD3 100%); }
-        .stat-card:nth-child(7) { background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%); }
+        .stat-card:nth-child(7) { background: linear-gradient(135deg, #D1F4E0 0%, #A7F3B8 100%); }
 
         body.dark-mode .stat-card {
             background: var(--card-bg) !important;
@@ -4810,14 +4810,18 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
             const soldCount = filtered.filter(s => s.sold).reduce((sum, s) => sum + s.quantity, 0);
             const stockCount = filtered.filter(s => !s.sold).reduce((sum, s) => sum + s.quantity, 0);
             
-            // Calculate Total Profit (Business Profit: Sell Price - Buy Price)
+            // Calculate Total Profit (Business Profit: Sell Price - Buy Price) - Only for sold items
             const totalProfit = filtered.reduce((sum, s) => {
+                if (!s.sold) return sum; // Only count sold items
                 const profit = ((s.price || 0) - (s.buyPrice || 0)) * s.quantity;
                 return sum + profit;
             }, 0);
             
-            // Calculate Total Salary (Commission earned by admin)
-            const totalSalary = filtered.reduce((sum, s) => sum + (s.totalCommission || 0), 0);
+            // Calculate Total Salary (Commission earned by admin) - Only for sold items
+            const totalSalary = filtered.reduce((sum, s) => {
+                if (!s.sold) return sum; // Only count sold items
+                return sum + (s.totalCommission || 0);
+            }, 0);
             
             const adminCount = users.filter(u => u.role === 'admin').length;
             
