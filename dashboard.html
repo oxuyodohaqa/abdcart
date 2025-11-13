@@ -364,6 +364,8 @@
         .stat-card:nth-child(5) { background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); }
         .stat-card:nth-child(6) { background: linear-gradient(135deg, #FFE4E6 0%, #FECDD3 100%); }
         .stat-card:nth-child(7) { background: linear-gradient(135deg, #D1F4E0 0%, #A7F3B8 100%); }
+        .stat-card:nth-child(8) { background: linear-gradient(135deg, #E0E7FF 0%, #C7D2FE 100%); }
+        .stat-card:nth-child(9) { background: linear-gradient(135deg, #FEF9C3 0%, #FDE047 100%); }
 
         body.dark-mode .stat-card {
             background: var(--card-bg) !important;
@@ -1782,6 +1784,21 @@ body.dark-mode .profile-select-btn {
                 <div class="stat-value" id="totalSales">₱0</div>
             </div>
             <div class="stat-card">
+                <div class="stat-icon">💵</div>
+                <div class="stat-label">Total Capital</div>
+                <div class="stat-value" id="totalCapital">₱0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🎯</div>
+                <div class="stat-label">Total Profit</div>
+                <div class="stat-value" id="totalProfit">₱0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">💰</div>
+                <div class="stat-label">Total Salary</div>
+                <div class="stat-value" id="totalSalary">₱0</div>
+            </div>
+            <div class="stat-card">
                 <div class="stat-icon">📦</div>
                 <div class="stat-label">Total Products</div>
                 <div class="stat-value" id="totalProducts">0</div>
@@ -1797,14 +1814,9 @@ body.dark-mode .profile-select-btn {
                 <div class="stat-value" id="stockCount">0</div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">🎯</div>
-                <div class="stat-label">Total Profit</div>
-                <div class="stat-value" id="totalProfit">₱0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">💰</div>
-                <div class="stat-label">Total Salary</div>
-                <div class="stat-value" id="totalSalary">₱0</div>
+                <div class="stat-icon">📈</div>
+                <div class="stat-label">Avg Sale Value</div>
+                <div class="stat-value" id="avgSaleValue">₱0</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">👥</div>
@@ -4812,10 +4824,10 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
                 
                 if (s.sold) {
                     acc.soldCount += s.quantity;
+                    // Calculate total capital (buy prices) for sold items
+                    acc.totalCapital += ((s.buyPrice || 0) * s.quantity);
                     // Calculate business profit (Sell Price - Buy Price) for sold items
                     acc.totalProfit += ((s.price || 0) - (s.buyPrice || 0)) * s.quantity;
-                    // Calculate commission earned for sold items
-                    acc.totalSalary += (s.totalCommission || 0);
                 } else {
                     acc.stockCount += s.quantity;
                 }
@@ -4823,21 +4835,33 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
                 return acc;
             }, {
                 totalSales: 0,
+                totalCapital: 0,
                 totalProducts: 0,
                 soldCount: 0,
                 stockCount: 0,
-                totalProfit: 0,
-                totalSalary: 0
+                totalProfit: 0
             });
+            
+            // Calculate Total Salary using total profit bracket method
+            // IMPORTANT: This applies ONE bracket rate to the total profit (not per-item calculation)
+            // Formula: Total Salary = Total Profit × Bracket Rate (%)
+            // Example: If Total Profit = ₱4,000 and bracket rate is 20%, then Total Salary = ₱800
+            const bracketRate = getCommissionRateForProfit(stats.totalProfit, currentSession.id);
+            const totalSalary = (stats.totalProfit * bracketRate) / 100;
+            
+            // Calculate average sale value
+            const avgSaleValue = stats.soldCount > 0 ? stats.totalSales / stats.soldCount : 0;
             
             const adminCount = users.filter(u => u.role === 'admin').length;
             
             document.getElementById('totalSales').textContent = '₱' + stats.totalSales.toFixed(2);
+            document.getElementById('totalCapital').textContent = '₱' + stats.totalCapital.toFixed(2);
             document.getElementById('totalProducts').textContent = stats.totalProducts;
             document.getElementById('soldCount').textContent = stats.soldCount;
             document.getElementById('stockCount').textContent = stats.stockCount;
             document.getElementById('totalProfit').textContent = '₱' + stats.totalProfit.toFixed(2);
-            document.getElementById('totalSalary').textContent = '₱' + stats.totalSalary.toFixed(2);
+            document.getElementById('totalSalary').textContent = '₱' + totalSalary.toFixed(2);
+            document.getElementById('avgSaleValue').textContent = '₱' + avgSaleValue.toFixed(2);
             document.getElementById('adminCount').textContent = adminCount;
         }
 
