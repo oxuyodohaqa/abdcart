@@ -2185,9 +2185,19 @@ body.dark-mode .profile-select-btn {
 
             <form id="createAccountForm" onsubmit="saveAccount(event)" class="form-section" style="border: none; box-shadow: none; padding-top: 10px;">
                 <div class="form-group">
+                    <label>🆔 Account ID</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="text" id="accountIdInput" placeholder="e.g. YTP-2401" required data-manual="false">
+                        <button type="button" class="btn btn-secondary" onclick="regenerateAccountId()">🔄 Generate</button>
+                    </div>
+                    <small style="display: block; margin-top: 5px; opacity: 0.7;">Each account needs a unique ID so profiles can be tracked per sale.</small>
+                </div>
+
+                <div class="form-group">
                     <label>📦 Status</label>
-                    <select id="productSoldStatus" required>
-                        <option value="yes" selected>Sold</option> <!-- Default to "Sold" -->
+                    <select id="accountStatusSelect" required>
+                        <option value="yes" selected>Sold</option>
+                        <option value="no">In Stock</option>
                     </select>
                 </div>
 
@@ -4212,24 +4222,28 @@ function updateProductDropdown() {
             
             if (isStreaming) {
                 document.getElementById('profileTrackingFields').style.display = 'block';
-                populateAccountDropdown(product.category);
+                populateAccountDropdown(product.name);
             } else {
                 document.getElementById('profileTrackingFields').style.display = 'none';
             }
         }
 
-        // Populate account dropdown based on product category
-        function populateAccountDropdown(category) {
+        // Populate account dropdown based on product name
+        function populateAccountDropdown(productName) {
             const accountSelect = document.getElementById('accountIdSelect');
             if (!accountSelect) return;
-            
+
             accountSelect.innerHTML = '<option value="">-- Select Account --</option>';
-            
-            const filteredAccounts = accounts.filter(acc => acc.product && acc.product.includes(category));
+
+            const normalizedProduct = productName ? productName.toLowerCase() : '';
+            const filteredAccounts = accounts.filter(acc => {
+                if (!normalizedProduct) return true;
+                return (acc.product || '').toLowerCase() === normalizedProduct;
+            });
             filteredAccounts.forEach(account => {
                 accountSelect.innerHTML += `<option value="${account.id}">${account.id} - ${account.product}</option>`;
             });
-            
+
             if (filteredAccounts.length === 0) {
                 accountSelect.innerHTML += '<option value="" disabled>No accounts available - Create one first</option>';
             }
@@ -4808,36 +4822,101 @@ getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
         // =================== ACCOUNT MANAGEMENT ===================
         
         function openAccountManagementModal() {
+            const form = document.getElementById('createAccountForm');
+            if (form) form.reset();
+
+            const accountIdInput = document.getElementById('accountIdInput');
+            if (accountIdInput) {
+                accountIdInput.dataset.manual = 'false';
+            }
+
+            fillAccountId(true);
             document.getElementById('accountManagementModal').classList.add('show');
         }
-        
+
         function closeAccountManagementModal() {
             document.getElementById('accountManagementModal').classList.remove('show');
-            document.getElementById('createAccountForm').reset();
+            const form = document.getElementById('createAccountForm');
+            if (form) form.reset();
+
+            const accountIdInput = document.getElementById('accountIdInput');
+            if (accountIdInput) {
+                accountIdInput.value = '';
+                accountIdInput.dataset.manual = 'false';
+            }
         }
-        
+
+        function generateAccountId(productName) {
+            const sanitized = (productName || 'ACC')
+                .toUpperCase()
+                .replace(/[^A-Z0-9]/g, '')
+                .slice(0, 4);
+            const prefix = sanitized || 'ACC';
+            const random = Math.floor(1000 + Math.random() * 9000);
+            return `${prefix}-${random}`;
+        }
+
+        function fillAccountId(force = false) {
+            const accountIdInput = document.getElementById('accountIdInput');
+            const productSelect = document.getElementById('accountProductSelect');
+            if (!accountIdInput || !productSelect) return;
+
+            const shouldFill = force || accountIdInput.dataset.manual === 'false' || accountIdInput.value.trim() === '';
+            if (!shouldFill) return;
+
+            accountIdInput.value = generateAccountId(productSelect.value);
+            accountIdInput.dataset.manual = 'false';
+        }
+
+        function regenerateAccountId() {
+            fillAccountId(true);
+        }
+
         function saveAccount(event) {
             event.preventDefault();
-            
+
             const accountId = document.getElementById('accountIdInput').value.trim();
             const product = document.getElementById('accountProductSelect').value;
-            const totalProfiles = parseInt(document.getElementById('accountProfilesInput').value);
-            const profileType = document.querySelector('input[name="accountProfileType"]:checked').value;
+            const totalProfiles = parseInt(document.getElementById('accountProfilesInput').value, 10);
+            const profileTypeElement = document.querySelector('input[name="accountProfileType"]:checked');
+            const profileType = profileTypeElement ? profileTypeElement.value : '';
+            const status = document.getElementById('accountStatusSelect').value;
             const slotsPerProfile = profileType === 'solo' ? 1 : 2;
-            
+
+            if (!accountId) {
+                showToast('⚠️ Please enter an account ID', 'error');
+                return;
+            }
+
+            if (!product) {
+                showToast('⚠️ Please select a product for the account', 'error');
+                return;
+            }
+
+            if (!profileType) {
+                showToast('⚠️ Please select a profile type', 'error');
+                return;
+            }
+
+            if (isNaN(totalProfiles) || totalProfiles <= 0) {
+                showToast('⚠️ Please provide how many profiles this account contains', 'error');
+                return;
+            }
+
             // Check if account ID already exists
-            const existingAccount = accounts.find(a => a.id === accountId);
+            const existingAccount = accounts.find(a => (a.id || '').toLowerCase() === accountId.toLowerCase());
             if (existingAccount) {
                 showToast('❌ Account ID already exists!', 'error');
                 return;
             }
-            
+
             const newAccount = {
                 id: accountId,
                 product: product,
                 totalProfiles: totalProfiles,
                 profileType: profileType,
                 slotsPerProfile: slotsPerProfile,
+                status: status,
                 createdDate: new Date().toISOString().split('T')[0],
                 createdBy: currentSession.username
             };
@@ -4867,7 +4946,12 @@ getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
                 const accountSales = sales.filter(s => s.accountId === account.id);
                 const totalRevenue = accountSales.reduce((sum, s) => sum + s.totalPrice, 0);
                 const totalCommissions = accountSales.reduce((sum, s) => sum + (s.commission * s.quantity), 0);
-                
+                const isSold = (account.status || 'no') === 'yes';
+                const statusText = isSold ? '✅ Sold' : '📦 In Stock';
+                const statusColor = isSold ? 'var(--danger)' : 'var(--success)';
+                const profileTypeLabel = account.profileType === 'shared' ? 'Shared' : 'Solo';
+                const slotsPerProfile = account.slotsPerProfile || (profileTypeLabel === 'Solo' ? 1 : 2);
+
                 // Build profile status
                 let profilesHTML = '';
                 for (let i = 1; i <= account.totalProfiles; i++) {
@@ -4918,7 +5002,10 @@ getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
                     <div class="product-item">
                         <div class="product-item-header">
                             <div class="product-item-name">🎬 ${account.id} - ${account.product}</div>
-                            <div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="padding: 6px 12px; border-radius: 999px; font-weight: 700; font-size: 0.9em; background: ${statusColor}20; color: ${statusColor};">
+                                    ${statusText}
+                                </span>
                                 ${currentSession.role === 'owner' ? `<button class="action-btn delete-btn" onclick="deleteAccount('${account.id}')">🗑️ Delete</button>` : ''}
                             </div>
                         </div>
@@ -4929,7 +5016,7 @@ getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
                             </div>
                             <div class="product-detail">
                                 <div class="product-detail-label">👥 Profile Type</div>
-                                <div class="product-detail-value">${account.profileType} (${account.slotsPerProfile} per profile)</div>
+                                <div class="product-detail-value">${profileTypeLabel} (${slotsPerProfile} per profile)</div>
                             </div>
                             <div class="product-detail">
                                 <div class="product-detail-label">💰 Total Revenue</div>
@@ -5800,7 +5887,22 @@ function calculateStats() {
             if (btnClearAll) {
                 btnClearAll.addEventListener('click', clearAllData);
             }
-            
+
+            const accountIdInput = document.getElementById('accountIdInput');
+            const accountProductSelect = document.getElementById('accountProductSelect');
+
+            if (accountIdInput) {
+                accountIdInput.addEventListener('input', () => {
+                    accountIdInput.dataset.manual = accountIdInput.value.trim() ? 'true' : 'false';
+                });
+            }
+
+            if (accountProductSelect) {
+                accountProductSelect.addEventListener('change', () => {
+                    fillAccountId(false);
+                });
+            }
+
             // Commission mode toggle for admin creation form
             const commissionModeRadios = document.querySelectorAll('input[name="commissionMode"]');
             commissionModeRadios.forEach(radio => {
