@@ -3643,15 +3643,16 @@ function loadAllSalesData() {
         getRef('sales/' + userKey).on('value', (snapshot) => {
             const salesData = snapshot.val() || {};
             sales = [];
-            
+
             console.log('📊 Admin sales data:', salesData);
-            
+
             Object.keys(salesData).forEach(saleKey => {
                 const sale = salesData[saleKey];
                 sale.id = saleKey;
                 sale.userName = currentSession.customName;
                 sale.userId = currentSession.id;
                 sale.userRole = currentSession.role;
+                sale.userKey = userKey;
                 sales.push(sale);
             });
             
@@ -4231,23 +4232,31 @@ function deleteSale(saleId, saleUserId = null) {
     let saleRef;
     let userKey;
 
-    if (currentSession.role === 'owner' && saleUserId && saleUserId !== currentSession.id) {
-        // Owner deleting admin sale - find admin's username
-        const adminUser = users.find(u => u.id === saleUserId);
+    const normalizedSaleUserId = (!saleUserId || saleUserId === 'undefined' || saleUserId === 'null')
+        ? null
+        : saleUserId;
+
+    const currentUserKey = currentSession.username.replace(/[.#$/[\]]/g, '_');
+    userKey = currentUserKey;
+
+    // Try to locate the sale from the in-memory list so we know which Firebase user bucket holds it
+    const localSale = sales.find(s => String(s.id) === String(saleId));
+    if (localSale && localSale.userKey) {
+        userKey = localSale.userKey;
+        console.log('🗂️ Located sale via cached data. userKey =', userKey);
+    } else if (currentSession.role === 'owner' && normalizedSaleUserId && normalizedSaleUserId !== currentSession.id) {
+        // Owner deleting an admin sale but the cached record didn't have a userKey
+        const adminUser = users.find(u => u.id === normalizedSaleUserId);
         if (adminUser) {
             userKey = adminUser.username.replace(/[.#$/[\]]/g, '_');
-            saleRef = getRef(`sales/${userKey}/${saleId}`);
-            console.log('👑 Owner deleting admin sale, path:', `sales/${userKey}/${saleId}`);
+            console.log('👑 Owner resolved userKey from admin list:', userKey);
         } else {
-            showToast('❌ Could not find admin user', 'error');
-            return;
+            console.warn('⚠️ Owner could not resolve admin from passed saleUserId. Falling back to current user.');
         }
-    } else {
-        // Regular deletion (own sales)
-        userKey = currentSession.username.replace(/[.#$/[\]]/g, '_');
-        saleRef = getRef(`sales/${userKey}/${saleId}`);
-        console.log('👤 Deleting own sale, path:', `sales/${userKey}/${saleId}`);
     }
+
+    saleRef = getRef(`sales/${userKey}/${saleId}`);
+    console.log('🗑️ Deleting sale from path:', `sales/${userKey}/${saleId}`);
     
     // First, check if sale exists and get its data
     saleRef.once('value').then((snapshot) => {
@@ -4812,28 +4821,6 @@ getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
                 });
         }
 
-function deleteSale(id) {
-    if (!confirm('Delete this sale?')) return;
-    
-    const sale = sales.find(s => s.id === id);
-    if (!sale) return;
-    
-    // FIX: Use the same method as when adding sales
-    const userKey = (sale.soldBy || currentSession.username).replace(/[.#$[\]]/g, '_');
-    
-    console.log('Deleting sale from path:', 'sales/' + userKey + '/' + id);
-    
-    getRef('sales/' + userKey + '/' + id).remove()
-        .then(() => {
-            showToast('🗑️ Sale deleted', 'info');
-            autoCalculatePayouts();
-        })
-        .catch((error) => {
-            console.error('Delete error:', error);
-            showToast('❌ Error: ' + error.message, 'error');
-        });
-}
-
 function editSale(id) {
     const sale = sales.find(s => s.id === id);
     if (!sale) return;
@@ -5111,42 +5098,49 @@ function calculateStats() {
             }
             
             tbody.innerHTML = filtered.map(sale => {
-                const warrantyClass = sale.warranty === 'FW' ? 'fw' : 'nw';
-                const accountClass = sale.accountType === 'Solo' ? 'solo' : 'shared';
+                const warranty = (sale.warranty || '').toUpperCase();
+                const warrantyClass = warranty === 'FW' ? 'fw' : 'nw';
+                const accountType = sale.accountType === 'Solo' ? 'Solo' : (sale.accountType || 'Shared');
+                const accountClass = accountType === 'Solo' ? 'solo' : 'shared';
                 const soldIcon = sale.sold ? '✅' : '📦';
-                
+
                 // Format profile tracking columns
                 const accountId = sale.accountId || '-';
                 const profileNumber = sale.profileNumber ? `Profile ${sale.profileNumber}` : '-';
                 const slotNumber = sale.slotNumber ? `${sale.slotNumber}/${sale.profileType === 'Solo' ? '1' : '2'}` : '-';
                 const profileName = sale.profileName || '-';
                 const soldBy = sale.soldBy || sale.userName || '-';
-                
-// In renderSalesTable() function, update the table row:
-return `
-    <tr data-sale-id="${sale.id}">
-        <td>${sale.date}</td>
-        ${currentSession.role === 'owner' ? `<td>${sale.userName}</td>` : ''}
-        <td>${sale.productName}</td>
-        <td>${sale.buyerUsername || '-'}</td>
-        <td>${sale.accountEmail || '-'}</td>
-        <td>${accountId}</td>
-        <td>${profileNumber}</td>
-        <td>${slotNumber}</td>
-        <td>${profileName}</td>
-        <td>${soldBy}</td>
-        <td><span class="warranty-badge ${warrantyClass}">${sale.warranty}</span></td>
-        <td><span class="account-type-badge ${accountClass}">${sale.accountType}</span></td>
-        <td>${sale.quantity}</td>
-        <td class="amount-cell">₱${sale.price.toFixed(2)}</td>
-        <td class="amount-cell">₱${sale.totalPrice.toFixed(2)}</td>
-        <td><span class="sold-check">✅</span></td>
-        <td>
-            <button class="action-btn edit-btn" onclick="editSale(${sale.id})">✏️</button>
-            <button class="action-btn delete-btn" onclick="deleteSale('${sale.id}', '${sale.userId}')">🗑️</button>
-        </td>
-    </tr>
-`;
+
+                // Older sales might have prices stored as strings. Normalize before formatting.
+                const quantity = parseInt(sale.quantity, 10) || 1;
+                const price = Number(sale.price) || 0;
+                const totalPrice = Number(sale.totalPrice);
+                const computedTotal = Number.isFinite(totalPrice) ? totalPrice : price * quantity;
+
+                return `
+                    <tr data-sale-id="${sale.id}">
+                        <td>${sale.date || '-'}</td>
+                        ${currentSession.role === 'owner' ? `<td>${sale.userName || '-'}</td>` : ''}
+                        <td>${sale.productName || '-'}</td>
+                        <td>${sale.buyerUsername || '-'}</td>
+                        <td>${sale.accountEmail || '-'}</td>
+                        <td>${accountId}</td>
+                        <td>${profileNumber}</td>
+                        <td>${slotNumber}</td>
+                        <td>${profileName}</td>
+                        <td>${soldBy}</td>
+                        <td><span class="warranty-badge ${warrantyClass}">${warranty || '-'}</span></td>
+                        <td><span class="account-type-badge ${accountClass}">${accountType}</span></td>
+                        <td>${quantity}</td>
+                        <td class="amount-cell">₱${price.toFixed(2)}</td>
+                        <td class="amount-cell">₱${computedTotal.toFixed(2)}</td>
+                        <td><span class="sold-check">${soldIcon}</span></td>
+                        <td>
+                            <button class="action-btn edit-btn" onclick="editSale(${sale.id})">✏️</button>
+                            <button class="action-btn delete-btn" onclick="deleteSale('${sale.id}', '${sale.userId}')">🗑️</button>
+                        </td>
+                    </tr>
+                `;
             }).join('');
         }
 
