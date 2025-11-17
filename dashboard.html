@@ -3220,13 +3220,6 @@ let commissionBrackets = []; // Store commission bracket configuration
             return { ...product, category: derivedCategory };
         }
 
-        function ensureAccountCategory(account) {
-            if (!account) return account;
-            if (account.category) return account;
-            const derivedCategory = determineProductCategory(account.product);
-            return { ...account, category: derivedCategory };
-        }
-
 // =================== DEFAULT PRODUCTS CATALOG ===================
 const DEFAULT_PRODUCTS = [
     // Disney
@@ -4244,58 +4237,20 @@ function updateProductDropdown() {
             }
         }
 
-        function getAccountSlotsPerProfile(account, fallbackProfileType = '') {
-            if (account) {
-                if (account.slotsPerProfile) {
-                    return account.slotsPerProfile;
-                }
-                if (account.profileType) {
-                    return account.profileType.toLowerCase() === 'shared' ? 2 : 1;
-                }
-            }
-
-            if (fallbackProfileType) {
-                return fallbackProfileType.toLowerCase() === 'shared' ? 2 : 1;
-            }
-
-            return 1;
-        }
-
         // Populate account dropdown based on product name
-        function populateAccountDropdown(productName = null) {
+        function populateAccountDropdown(productName) {
             const accountSelect = document.getElementById('accountIdSelect');
             const profileSelect = document.getElementById('profileNumberSelect');
             const profileStatusDisplay = document.getElementById('profileStatusDisplay');
             if (!accountSelect) return;
 
-            const filterSource = productName !== null ? productName : lastProductNameForAccountFilter;
-            if (productName !== null) {
-                lastProductNameForAccountFilter = productName || '';
-            }
-            const previousSelection = accountSelect.value;
             accountSelect.innerHTML = '<option value="">-- Select Account --</option>';
 
-            if (profileSelect) {
-                profileSelect.innerHTML = '<option value="">-- Select Profile --</option>';
-            }
-            if (profileStatusDisplay) {
-                profileStatusDisplay.style.display = 'none';
-            }
-
-            const targetCategory = filterSource ? determineProductCategory(filterSource) : '';
-            const filteredAccounts = accounts
-                .filter(account => {
-                    if (!targetCategory) return true;
-                    const accountCategory = account.category || determineProductCategory(account.product);
-                    return accountCategory === targetCategory;
-                })
-                .sort((a, b) => {
-                    if (a.status === b.status) {
-                        return (a.id || '').localeCompare(b.id || '');
-                    }
-                    return a.status === 'no' ? -1 : 1; // Show in-stock accounts first
-                });
-
+            const normalizedProduct = productName ? productName.toLowerCase() : '';
+            const filteredAccounts = accounts.filter(acc => {
+                if (!normalizedProduct) return true;
+                return (acc.product || '').toLowerCase() === normalizedProduct;
+            });
             filteredAccounts.forEach(account => {
                 const statusLabel = account.status === 'yes' ? 'Sold' : 'In Stock';
                 accountSelect.innerHTML += `<option value="${account.id}">${account.id} - ${account.product} (${statusLabel})</option>`;
@@ -5022,7 +4977,6 @@ getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
                 profileType: profileType,
                 slotsPerProfile: slotsPerProfile,
                 status: status,
-                category: determineProductCategory(product),
                 createdDate: new Date().toISOString().split('T')[0],
                 createdBy: currentSession.username
             };
