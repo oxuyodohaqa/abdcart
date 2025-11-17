@@ -2182,15 +2182,15 @@ body.dark-mode .profile-select-btn {
                 <h2>🎬 Create Account</h2>
                 <button class="close-btn" onclick="closeAccountManagementModal()">✕</button>
             </div>
-            
-<div class="form-group">
-    <label>📦 Status</label>
-    <select id="productSoldStatus" required>
-        <option value="yes" selected>Sold</option> <!-- Default to "Sold" -->
-    </select>
-</div>
 
-                
+            <form id="createAccountForm" onsubmit="saveAccount(event)" class="form-section" style="border: none; box-shadow: none; padding-top: 10px;">
+                <div class="form-group">
+                    <label>📦 Status</label>
+                    <select id="productSoldStatus" required>
+                        <option value="yes" selected>Sold</option> <!-- Default to "Sold" -->
+                    </select>
+                </div>
+
                 <div class="form-group">
                     <label>📦 Product</label>
                     <select id="accountProductSelect" required>
@@ -2240,7 +2240,7 @@ body.dark-mode .profile-select-btn {
                         </div>
                     </div>
                 </div>
-                
+
                 <button type="submit" class="btn btn-success">✅ Create Account</button>
             </form>
         </div>
@@ -3151,6 +3151,64 @@ let commissionBrackets = []; // Store commission bracket configuration
         // Streaming service categories for profile tracking
         const STREAMING_CATEGORIES = ['Netflix', 'Disney', 'HBO', 'YouTube', 'Prime Video', 'Apple TV+', 'Paramount+', 'Discovery+', 'Crunchyroll', 'VIU', 'WeTV', 'Vimeo', 'iQIYI', 'Loklok', 'iWant', 'Vivaone', 'Vivamax', 'Vivabundle'];
 
+        const CATEGORY_KEYWORDS = [
+            { category: 'Netflix', keywords: ['netflix'] },
+            { category: 'Disney', keywords: ['disney'] },
+            { category: 'HBO', keywords: ['hbo'] },
+            { category: 'YouTube', keywords: ['youtube'] },
+            { category: 'Prime Video', keywords: ['prime video', 'amazon prime', 'prime'] },
+            { category: 'Apple TV+', keywords: ['apple tv', 'apple tv+'] },
+            { category: 'Paramount+', keywords: ['paramount'] },
+            { category: 'Discovery+', keywords: ['discovery'] },
+            { category: 'Crunchyroll', keywords: ['crunchyroll'] },
+            { category: 'VIU', keywords: ['viu'] },
+            { category: 'WeTV', keywords: ['wetv'] },
+            { category: 'Vimeo', keywords: ['vimeo'] },
+            { category: 'iQIYI', keywords: ['iqiyi'] },
+            { category: 'Loklok', keywords: ['loklok'] },
+            { category: 'iWant', keywords: ['iwant'] },
+            { category: 'Vivaone', keywords: ['vivaone'] },
+            { category: 'Vivamax', keywords: ['vivamax'] },
+            { category: 'Vivabundle', keywords: ['vivabundle'] },
+            { category: 'Spotify', keywords: ['spotify'] },
+            { category: 'Apple Music', keywords: ['apple music'] },
+            { category: 'Canva', keywords: ['canva'] },
+            { category: 'Adobe Creative Cloud', keywords: ['adobe'] },
+            { category: 'ChatGPT', keywords: ['chatgpt'] },
+            { category: 'Grammarly', keywords: ['grammarly'] },
+            { category: 'Quillbot', keywords: ['quillbot'] },
+            { category: 'Notion', keywords: ['notion'] },
+            { category: 'Evernote', keywords: ['evernote'] },
+            { category: 'Microsoft 365', keywords: ['microsoft', 'office 365'] },
+            { category: 'LinkedIn Premium', keywords: ['linkedin'] },
+            { category: 'Dropbox', keywords: ['dropbox'] },
+            { category: 'Remini', keywords: ['remini'] },
+            { category: 'CapCut', keywords: ['capcut'] },
+            { category: 'Duolingo', keywords: ['duolingo'] },
+            { category: 'Calm', keywords: ['calm'] },
+            { category: 'Headspace', keywords: ['headspace'] }
+        ];
+
+        function determineProductCategory(productName) {
+            if (!productName) return 'Other';
+            const normalizedName = productName.toLowerCase();
+
+            for (const entry of CATEGORY_KEYWORDS) {
+                if (entry.keywords.some(keyword => normalizedName.includes(keyword))) {
+                    return entry.category;
+                }
+            }
+
+            return 'Other';
+        }
+
+        function ensureProductCategory(product) {
+            if (!product) return product;
+            if (product.category) return product;
+            const derivedCategory = determineProductCategory(product.name);
+            return { ...product, category: derivedCategory };
+        }
+
 // =================== DEFAULT PRODUCTS CATALOG ===================
 const DEFAULT_PRODUCTS = [
     // Disney
@@ -3390,8 +3448,20 @@ function renderSubscriptionProducts() {
     }
     
     container.innerHTML = subscriptionProducts.map(product => {
-        const availableCount = product.profiles.filter(p => !p.sold).length;
-        
+        const profiles = product.profiles || [];
+        const availableCount = profiles.filter(p => !p.sold).length;
+        const totalProfiles = product.totalProfiles || profiles.length || 0;
+        const fullPrice = typeof product.fullPrice === 'number' ? product.fullPrice : parseFloat(product.fullPrice) || 0;
+        const buyPrice = typeof product.buyPrice === 'number' ? product.buyPrice : parseFloat(product.buyPrice) || 0;
+        const soloPrice = typeof product.soloPrice === 'number'
+            ? product.soloPrice
+            : (typeof product.profilePrice === 'number'
+                ? product.profilePrice
+                : (totalProfiles > 0 ? fullPrice / totalProfiles : 0));
+        const sharedPrice = typeof product.sharedPrice === 'number'
+            ? product.sharedPrice
+            : fullPrice;
+
         return `
             <div class="subscription-product-item">
                 <div class="subscription-header">
@@ -3400,19 +3470,20 @@ function renderSubscriptionProducts() {
                         <button class="action-btn delete-btn" onclick="deleteSubscriptionProduct(${product.id})">🗑️</button>
                     </div>
                 </div>
-                
+
                 <div class="subscription-pricing">
-                    <div class="price-tag">💰 Full: ₱${product.fullPrice.toFixed(2)}</div>
-                    <div class="price-tag">👤 Profile: ₱${product.profilePrice.toFixed(2)}</div>
-                    <div class="price-tag">🛒 Cost: ₱${product.buyPrice.toFixed(2)}</div>
+                    <div class="price-tag">💰 Full: ₱${fullPrice.toFixed(2)}</div>
+                    <div class="price-tag">👤 Solo: ₱${soloPrice.toFixed(2)}</div>
+                    <div class="price-tag">👥 Shared: ₱${sharedPrice.toFixed(2)}</div>
+                    <div class="price-tag">🛒 Cost: ₱${buyPrice.toFixed(2)}</div>
                 </div>
                 
                 <div class="availability-status">
-                    ${availableCount}/${product.totalProfiles} profiles available
+                    ${availableCount}/${totalProfiles} profiles available
                 </div>
                 
                 <div class="profile-grid">
-                    ${product.profiles.map(profile => `
+                    ${profiles.map(profile => `
                         <div class="profile-slot ${profile.sold ? 'sold' : 'available'}">
                             <div class="profile-slot-icon">${profile.sold ? '✅' : '📦'}</div>
                             <div class="profile-slot-label">Profile ${profile.number}</div>
@@ -3566,7 +3637,7 @@ function loadAllData() {
     // Load products
     getRef('products').on('value', (snapshot) => {
         const productsData = snapshot.val() || {};
-        products = Object.values(productsData);
+        products = Object.values(productsData).map(product => ensureProductCategory(product));
         console.log('✅ Loaded products:', products.length);
         updateProductDropdown();
         // Both owners and admins can view products
@@ -3884,6 +3955,7 @@ function autoCalculatePrices() {
                 buyPrice: buyPrice,
                 sellPrice: sellPrice,
                 margin: margin,
+                category: determineProductCategory(productName),
                 createdDate: new Date().toISOString().split('T')[0]
             };
             
@@ -4425,7 +4497,8 @@ function deleteSale(saleId, saleUserId = null) {
             document.getElementById('editProductName').value = product.name;
             document.getElementById('editProductBuyPrice').value = product.buyPrice;
             document.getElementById('editProductSellPrice').value = product.sellPrice;
-            document.getElementById('editProductCategory').value = product.category || 'Other';
+            const editCategory = product.category || determineProductCategory(product.name);
+            document.getElementById('editProductCategory').value = editCategory || 'Other';
             
             // Set account type checkboxes
             document.getElementById('editTypeSolo').checked = false;
