@@ -2182,15 +2182,15 @@ body.dark-mode .profile-select-btn {
                 <h2>🎬 Create Account</h2>
                 <button class="close-btn" onclick="closeAccountManagementModal()">✕</button>
             </div>
-            
-<div class="form-group">
-    <label>📦 Status</label>
-    <select id="productSoldStatus" required>
-        <option value="yes" selected>Sold</option> <!-- Default to "Sold" -->
-    </select>
-</div>
 
-                
+            <form id="createAccountForm" onsubmit="saveAccount(event)" class="form-section" style="border: none; box-shadow: none; padding-top: 10px;">
+                <div class="form-group">
+                    <label>📦 Status</label>
+                    <select id="productSoldStatus" required>
+                        <option value="yes" selected>Sold</option> <!-- Default to "Sold" -->
+                    </select>
+                </div>
+
                 <div class="form-group">
                     <label>📦 Product</label>
                     <select id="accountProductSelect" required>
@@ -2240,7 +2240,7 @@ body.dark-mode .profile-select-btn {
                         </div>
                     </div>
                 </div>
-                
+
                 <button type="submit" class="btn btn-success">✅ Create Account</button>
             </form>
         </div>
