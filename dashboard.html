@@ -2182,15 +2182,25 @@ body.dark-mode .profile-select-btn {
                 <h2>🎬 Create Account</h2>
                 <button class="close-btn" onclick="closeAccountManagementModal()">✕</button>
             </div>
-            
-<div class="form-group">
-    <label>📦 Status</label>
-    <select id="productSoldStatus" required>
-        <option value="yes" selected>Sold</option> <!-- Default to "Sold" -->
-    </select>
-</div>
 
-                
+            <form id="createAccountForm" onsubmit="saveAccount(event)" class="form-section" style="border: none; box-shadow: none; padding-top: 10px;">
+                <div class="form-group">
+                    <label>🆔 Account ID</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="text" id="accountIdInput" placeholder="e.g. YTP-2401" required data-manual="false">
+                        <button type="button" class="btn btn-secondary" onclick="regenerateAccountId()">🔄 Generate</button>
+                    </div>
+                    <small style="display: block; margin-top: 5px; opacity: 0.7;">Each account needs a unique ID so profiles can be tracked per sale.</small>
+                </div>
+
+                <div class="form-group">
+                    <label>📦 Status</label>
+                    <select id="accountStatusSelect" required>
+                        <option value="yes" selected>Sold</option>
+                        <option value="no">In Stock</option>
+                    </select>
+                </div>
+
                 <div class="form-group">
                     <label>📦 Product</label>
                     <select id="accountProductSelect" required>
@@ -2240,7 +2250,7 @@ body.dark-mode .profile-select-btn {
                         </div>
                     </div>
                 </div>
-                
+
                 <button type="submit" class="btn btn-success">✅ Create Account</button>
             </form>
         </div>
@@ -3151,6 +3161,64 @@ let commissionBrackets = []; // Store commission bracket configuration
         // Streaming service categories for profile tracking
         const STREAMING_CATEGORIES = ['Netflix', 'Disney', 'HBO', 'YouTube', 'Prime Video', 'Apple TV+', 'Paramount+', 'Discovery+', 'Crunchyroll', 'VIU', 'WeTV', 'Vimeo', 'iQIYI', 'Loklok', 'iWant', 'Vivaone', 'Vivamax', 'Vivabundle'];
 
+        const CATEGORY_KEYWORDS = [
+            { category: 'Netflix', keywords: ['netflix'] },
+            { category: 'Disney', keywords: ['disney'] },
+            { category: 'HBO', keywords: ['hbo'] },
+            { category: 'YouTube', keywords: ['youtube'] },
+            { category: 'Prime Video', keywords: ['prime video', 'amazon prime', 'prime'] },
+            { category: 'Apple TV+', keywords: ['apple tv', 'apple tv+'] },
+            { category: 'Paramount+', keywords: ['paramount'] },
+            { category: 'Discovery+', keywords: ['discovery'] },
+            { category: 'Crunchyroll', keywords: ['crunchyroll'] },
+            { category: 'VIU', keywords: ['viu'] },
+            { category: 'WeTV', keywords: ['wetv'] },
+            { category: 'Vimeo', keywords: ['vimeo'] },
+            { category: 'iQIYI', keywords: ['iqiyi'] },
+            { category: 'Loklok', keywords: ['loklok'] },
+            { category: 'iWant', keywords: ['iwant'] },
+            { category: 'Vivaone', keywords: ['vivaone'] },
+            { category: 'Vivamax', keywords: ['vivamax'] },
+            { category: 'Vivabundle', keywords: ['vivabundle'] },
+            { category: 'Spotify', keywords: ['spotify'] },
+            { category: 'Apple Music', keywords: ['apple music'] },
+            { category: 'Canva', keywords: ['canva'] },
+            { category: 'Adobe Creative Cloud', keywords: ['adobe'] },
+            { category: 'ChatGPT', keywords: ['chatgpt'] },
+            { category: 'Grammarly', keywords: ['grammarly'] },
+            { category: 'Quillbot', keywords: ['quillbot'] },
+            { category: 'Notion', keywords: ['notion'] },
+            { category: 'Evernote', keywords: ['evernote'] },
+            { category: 'Microsoft 365', keywords: ['microsoft', 'office 365'] },
+            { category: 'LinkedIn Premium', keywords: ['linkedin'] },
+            { category: 'Dropbox', keywords: ['dropbox'] },
+            { category: 'Remini', keywords: ['remini'] },
+            { category: 'CapCut', keywords: ['capcut'] },
+            { category: 'Duolingo', keywords: ['duolingo'] },
+            { category: 'Calm', keywords: ['calm'] },
+            { category: 'Headspace', keywords: ['headspace'] }
+        ];
+
+        function determineProductCategory(productName) {
+            if (!productName) return 'Other';
+            const normalizedName = productName.toLowerCase();
+
+            for (const entry of CATEGORY_KEYWORDS) {
+                if (entry.keywords.some(keyword => normalizedName.includes(keyword))) {
+                    return entry.category;
+                }
+            }
+
+            return 'Other';
+        }
+
+        function ensureProductCategory(product) {
+            if (!product) return product;
+            if (product.category) return product;
+            const derivedCategory = determineProductCategory(product.name);
+            return { ...product, category: derivedCategory };
+        }
+
 // =================== DEFAULT PRODUCTS CATALOG ===================
 const DEFAULT_PRODUCTS = [
     // Disney
@@ -3390,8 +3458,20 @@ function renderSubscriptionProducts() {
     }
     
     container.innerHTML = subscriptionProducts.map(product => {
-        const availableCount = product.profiles.filter(p => !p.sold).length;
-        
+        const profiles = product.profiles || [];
+        const availableCount = profiles.filter(p => !p.sold).length;
+        const totalProfiles = product.totalProfiles || profiles.length || 0;
+        const fullPrice = typeof product.fullPrice === 'number' ? product.fullPrice : parseFloat(product.fullPrice) || 0;
+        const buyPrice = typeof product.buyPrice === 'number' ? product.buyPrice : parseFloat(product.buyPrice) || 0;
+        const soloPrice = typeof product.soloPrice === 'number'
+            ? product.soloPrice
+            : (typeof product.profilePrice === 'number'
+                ? product.profilePrice
+                : (totalProfiles > 0 ? fullPrice / totalProfiles : 0));
+        const sharedPrice = typeof product.sharedPrice === 'number'
+            ? product.sharedPrice
+            : fullPrice;
+
         return `
             <div class="subscription-product-item">
                 <div class="subscription-header">
@@ -3400,19 +3480,20 @@ function renderSubscriptionProducts() {
                         <button class="action-btn delete-btn" onclick="deleteSubscriptionProduct(${product.id})">🗑️</button>
                     </div>
                 </div>
-                
+
                 <div class="subscription-pricing">
-                    <div class="price-tag">💰 Full: ₱${product.fullPrice.toFixed(2)}</div>
-                    <div class="price-tag">👤 Profile: ₱${product.profilePrice.toFixed(2)}</div>
-                    <div class="price-tag">🛒 Cost: ₱${product.buyPrice.toFixed(2)}</div>
+                    <div class="price-tag">💰 Full: ₱${fullPrice.toFixed(2)}</div>
+                    <div class="price-tag">👤 Solo: ₱${soloPrice.toFixed(2)}</div>
+                    <div class="price-tag">👥 Shared: ₱${sharedPrice.toFixed(2)}</div>
+                    <div class="price-tag">🛒 Cost: ₱${buyPrice.toFixed(2)}</div>
                 </div>
                 
                 <div class="availability-status">
-                    ${availableCount}/${product.totalProfiles} profiles available
+                    ${availableCount}/${totalProfiles} profiles available
                 </div>
                 
                 <div class="profile-grid">
-                    ${product.profiles.map(profile => `
+                    ${profiles.map(profile => `
                         <div class="profile-slot ${profile.sold ? 'sold' : 'available'}">
                             <div class="profile-slot-icon">${profile.sold ? '✅' : '📦'}</div>
                             <div class="profile-slot-label">Profile ${profile.number}</div>
@@ -3566,7 +3647,7 @@ function loadAllData() {
     // Load products
     getRef('products').on('value', (snapshot) => {
         const productsData = snapshot.val() || {};
-        products = Object.values(productsData);
+        products = Object.values(productsData).map(product => ensureProductCategory(product));
         console.log('✅ Loaded products:', products.length);
         updateProductDropdown();
         // Both owners and admins can view products
@@ -3884,6 +3965,7 @@ function autoCalculatePrices() {
                 buyPrice: buyPrice,
                 sellPrice: sellPrice,
                 margin: margin,
+                category: determineProductCategory(productName),
                 createdDate: new Date().toISOString().split('T')[0]
             };
             
@@ -4140,24 +4222,28 @@ function updateProductDropdown() {
             
             if (isStreaming) {
                 document.getElementById('profileTrackingFields').style.display = 'block';
-                populateAccountDropdown(product.category);
+                populateAccountDropdown(product.name);
             } else {
                 document.getElementById('profileTrackingFields').style.display = 'none';
             }
         }
 
-        // Populate account dropdown based on product category
-        function populateAccountDropdown(category) {
+        // Populate account dropdown based on product name
+        function populateAccountDropdown(productName) {
             const accountSelect = document.getElementById('accountIdSelect');
             if (!accountSelect) return;
-            
+
             accountSelect.innerHTML = '<option value="">-- Select Account --</option>';
-            
-            const filteredAccounts = accounts.filter(acc => acc.product && acc.product.includes(category));
+
+            const normalizedProduct = productName ? productName.toLowerCase() : '';
+            const filteredAccounts = accounts.filter(acc => {
+                if (!normalizedProduct) return true;
+                return (acc.product || '').toLowerCase() === normalizedProduct;
+            });
             filteredAccounts.forEach(account => {
                 accountSelect.innerHTML += `<option value="${account.id}">${account.id} - ${account.product}</option>`;
             });
-            
+
             if (filteredAccounts.length === 0) {
                 accountSelect.innerHTML += '<option value="" disabled>No accounts available - Create one first</option>';
             }
@@ -4425,7 +4511,8 @@ function deleteSale(saleId, saleUserId = null) {
             document.getElementById('editProductName').value = product.name;
             document.getElementById('editProductBuyPrice').value = product.buyPrice;
             document.getElementById('editProductSellPrice').value = product.sellPrice;
-            document.getElementById('editProductCategory').value = product.category || 'Other';
+            const editCategory = product.category || determineProductCategory(product.name);
+            document.getElementById('editProductCategory').value = editCategory || 'Other';
             
             // Set account type checkboxes
             document.getElementById('editTypeSolo').checked = false;
@@ -4735,36 +4822,101 @@ getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
         // =================== ACCOUNT MANAGEMENT ===================
         
         function openAccountManagementModal() {
+            const form = document.getElementById('createAccountForm');
+            if (form) form.reset();
+
+            const accountIdInput = document.getElementById('accountIdInput');
+            if (accountIdInput) {
+                accountIdInput.dataset.manual = 'false';
+            }
+
+            fillAccountId(true);
             document.getElementById('accountManagementModal').classList.add('show');
         }
-        
+
         function closeAccountManagementModal() {
             document.getElementById('accountManagementModal').classList.remove('show');
-            document.getElementById('createAccountForm').reset();
+            const form = document.getElementById('createAccountForm');
+            if (form) form.reset();
+
+            const accountIdInput = document.getElementById('accountIdInput');
+            if (accountIdInput) {
+                accountIdInput.value = '';
+                accountIdInput.dataset.manual = 'false';
+            }
         }
-        
+
+        function generateAccountId(productName) {
+            const sanitized = (productName || 'ACC')
+                .toUpperCase()
+                .replace(/[^A-Z0-9]/g, '')
+                .slice(0, 4);
+            const prefix = sanitized || 'ACC';
+            const random = Math.floor(1000 + Math.random() * 9000);
+            return `${prefix}-${random}`;
+        }
+
+        function fillAccountId(force = false) {
+            const accountIdInput = document.getElementById('accountIdInput');
+            const productSelect = document.getElementById('accountProductSelect');
+            if (!accountIdInput || !productSelect) return;
+
+            const shouldFill = force || accountIdInput.dataset.manual === 'false' || accountIdInput.value.trim() === '';
+            if (!shouldFill) return;
+
+            accountIdInput.value = generateAccountId(productSelect.value);
+            accountIdInput.dataset.manual = 'false';
+        }
+
+        function regenerateAccountId() {
+            fillAccountId(true);
+        }
+
         function saveAccount(event) {
             event.preventDefault();
-            
+
             const accountId = document.getElementById('accountIdInput').value.trim();
             const product = document.getElementById('accountProductSelect').value;
-            const totalProfiles = parseInt(document.getElementById('accountProfilesInput').value);
-            const profileType = document.querySelector('input[name="accountProfileType"]:checked').value;
+            const totalProfiles = parseInt(document.getElementById('accountProfilesInput').value, 10);
+            const profileTypeElement = document.querySelector('input[name="accountProfileType"]:checked');
+            const profileType = profileTypeElement ? profileTypeElement.value : '';
+            const status = document.getElementById('accountStatusSelect').value;
             const slotsPerProfile = profileType === 'solo' ? 1 : 2;
-            
+
+            if (!accountId) {
+                showToast('⚠️ Please enter an account ID', 'error');
+                return;
+            }
+
+            if (!product) {
+                showToast('⚠️ Please select a product for the account', 'error');
+                return;
+            }
+
+            if (!profileType) {
+                showToast('⚠️ Please select a profile type', 'error');
+                return;
+            }
+
+            if (isNaN(totalProfiles) || totalProfiles <= 0) {
+                showToast('⚠️ Please provide how many profiles this account contains', 'error');
+                return;
+            }
+
             // Check if account ID already exists
-            const existingAccount = accounts.find(a => a.id === accountId);
+            const existingAccount = accounts.find(a => (a.id || '').toLowerCase() === accountId.toLowerCase());
             if (existingAccount) {
                 showToast('❌ Account ID already exists!', 'error');
                 return;
             }
-            
+
             const newAccount = {
                 id: accountId,
                 product: product,
                 totalProfiles: totalProfiles,
                 profileType: profileType,
                 slotsPerProfile: slotsPerProfile,
+                status: status,
                 createdDate: new Date().toISOString().split('T')[0],
                 createdBy: currentSession.username
             };
@@ -4794,7 +4946,12 @@ getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
                 const accountSales = sales.filter(s => s.accountId === account.id);
                 const totalRevenue = accountSales.reduce((sum, s) => sum + s.totalPrice, 0);
                 const totalCommissions = accountSales.reduce((sum, s) => sum + (s.commission * s.quantity), 0);
-                
+                const isSold = (account.status || 'no') === 'yes';
+                const statusText = isSold ? '✅ Sold' : '📦 In Stock';
+                const statusColor = isSold ? 'var(--danger)' : 'var(--success)';
+                const profileTypeLabel = account.profileType === 'shared' ? 'Shared' : 'Solo';
+                const slotsPerProfile = account.slotsPerProfile || (profileTypeLabel === 'Solo' ? 1 : 2);
+
                 // Build profile status
                 let profilesHTML = '';
                 for (let i = 1; i <= account.totalProfiles; i++) {
@@ -4845,7 +5002,10 @@ getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
                     <div class="product-item">
                         <div class="product-item-header">
                             <div class="product-item-name">🎬 ${account.id} - ${account.product}</div>
-                            <div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="padding: 6px 12px; border-radius: 999px; font-weight: 700; font-size: 0.9em; background: ${statusColor}20; color: ${statusColor};">
+                                    ${statusText}
+                                </span>
                                 ${currentSession.role === 'owner' ? `<button class="action-btn delete-btn" onclick="deleteAccount('${account.id}')">🗑️ Delete</button>` : ''}
                             </div>
                         </div>
@@ -4856,7 +5016,7 @@ getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
                             </div>
                             <div class="product-detail">
                                 <div class="product-detail-label">👥 Profile Type</div>
-                                <div class="product-detail-value">${account.profileType} (${account.slotsPerProfile} per profile)</div>
+                                <div class="product-detail-value">${profileTypeLabel} (${slotsPerProfile} per profile)</div>
                             </div>
                             <div class="product-detail">
                                 <div class="product-detail-label">💰 Total Revenue</div>
@@ -5727,7 +5887,22 @@ function calculateStats() {
             if (btnClearAll) {
                 btnClearAll.addEventListener('click', clearAllData);
             }
-            
+
+            const accountIdInput = document.getElementById('accountIdInput');
+            const accountProductSelect = document.getElementById('accountProductSelect');
+
+            if (accountIdInput) {
+                accountIdInput.addEventListener('input', () => {
+                    accountIdInput.dataset.manual = accountIdInput.value.trim() ? 'true' : 'false';
+                });
+            }
+
+            if (accountProductSelect) {
+                accountProductSelect.addEventListener('change', () => {
+                    fillAccountId(false);
+                });
+            }
+
             // Commission mode toggle for admin creation form
             const commissionModeRadios = document.querySelectorAll('input[name="commissionMode"]');
             commissionModeRadios.forEach(radio => {
