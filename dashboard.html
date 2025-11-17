@@ -2577,13 +2577,13 @@ body.dark-mode .profile-select-btn {
             
             <!-- Payout Period Filter -->
             <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
-                <button class="filter-btn active" id="payoutPeriodAll" onclick="setPayoutPeriod('all')">📊 All Time</button>
-                <button class="filter-btn" id="payoutPeriodWeek" onclick="setPayoutPeriod('week')">📅 This Week</button>
-                <button class="filter-btn" id="payoutPeriodMonth" onclick="setPayoutPeriod('month')">📆 This Month</button>
+                <button class="filter-btn payout-period-btn active" data-payout-period="all" onclick="setPayoutPeriod('all')">📊 All Time</button>
+                <button class="filter-btn payout-period-btn" data-payout-period="week" onclick="setPayoutPeriod('week')">📅 This Week</button>
+                <button class="filter-btn payout-period-btn" data-payout-period="month" onclick="setPayoutPeriod('month')">📆 This Month</button>
                 <button class="btn btn-info" onclick="openPayoutHistory()">📜 View History</button>
             </div>
 
-            <div class="payout-list" id="payoutList"></div>
+            <div class="payout-list" id="ownerPayoutList" data-payout-list></div>
         </div>
     </div>
 
@@ -2919,12 +2919,12 @@ body.dark-mode .profile-select-btn {
             </div>
             
             <div class="period-tabs" style="margin-bottom: 20px;">
-                <button class="period-tab active" id="payoutPeriodAll" onclick="setPayoutPeriod('all')">📊 All Time</button>
-                <button class="period-tab" id="payoutPeriodWeek" onclick="setPayoutPeriod('week')">📅 This Week</button>
-                <button class="period-tab" id="payoutPeriodMonth" onclick="setPayoutPeriod('month')">📆 This Month</button>
+                <button class="period-tab payout-period-btn active" data-payout-period="all" onclick="setPayoutPeriod('all')">📊 All Time</button>
+                <button class="period-tab payout-period-btn" data-payout-period="week" onclick="setPayoutPeriod('week')">📅 This Week</button>
+                <button class="period-tab payout-period-btn" data-payout-period="month" onclick="setPayoutPeriod('month')">📆 This Month</button>
             </div>
-            
-            <div id="payoutList" class="payout-list">
+
+            <div id="payoutList" class="payout-list" data-payout-list>
                 <!-- Payout items will be dynamically generated -->
             </div>
         </div>
@@ -5280,21 +5280,28 @@ function calculateStats() {
 
         function setPayoutPeriod(period) {
             currentPayoutPeriod = period;
-            
-            // Update button states
-            document.querySelectorAll('#payoutPeriodAll, #payoutPeriodWeek, #payoutPeriodMonth').forEach(btn => {
-                btn.classList.remove('active');
+
+            // Update button states across every payout view
+            document.querySelectorAll('[data-payout-period]').forEach(btn => {
+                if (btn.dataset.payoutPeriod === period) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
             });
-            document.getElementById('payoutPeriod' + period.charAt(0).toUpperCase() + period.slice(1)).classList.add('active');
-            
+
             autoCalculatePayouts();
         }
 
         function renderPayoutList() {
-            const payoutList = document.getElementById('payoutList');
-            
+            const payoutLists = document.querySelectorAll('[data-payout-list]');
+            if (!payoutLists.length) return;
+
+            const emptyState = '<div class="empty-state"><div class="empty-icon">💰</div><p>No payouts yet</p></div>';
+            const emptyPendingState = '<div class="empty-state"><div class="empty-icon">💰</div><p>No pending payouts</p></div>';
+
             if (payouts.length === 0) {
-                payoutList.innerHTML = '<div class="empty-state"><div class="empty-icon">💰</div><p>No payouts yet</p></div>';
+                payoutLists.forEach(list => list.innerHTML = emptyState);
                 return;
             }
             
@@ -5302,7 +5309,7 @@ function calculateStats() {
             const now = new Date();
             let filteredPayouts = payouts.filter(p => p.status === 'pending');
             
-            payoutList.innerHTML = filteredPayouts.map(payout => {
+            const listMarkup = filteredPayouts.map(payout => {
                 const user = users.find(u => u.id === payout.userId);
                 if (!user) return '';
                 
@@ -5351,10 +5358,9 @@ function calculateStats() {
                     </div>
                 `;
             }).join('');
-            
-            if (filteredPayouts.length === 0) {
-                payoutList.innerHTML = '<div class="empty-state"><div class="empty-icon">💰</div><p>No pending payouts</p></div>';
-            }
+
+            const finalMarkup = listMarkup.trim() ? listMarkup : emptyPendingState;
+            payoutLists.forEach(list => list.innerHTML = finalMarkup);
         }
 
         function openMarkPaidModal(payoutId, userId, amount) {
@@ -5583,9 +5589,10 @@ function calculateStats() {
         function setupEventListeners() {
             console.log('⚙️ Setting up event listeners...');
             
-            document.querySelectorAll('.period-tab').forEach(tab => {
+            const dashboardPeriodTabs = document.querySelectorAll('.period-tab[data-period]');
+            dashboardPeriodTabs.forEach(tab => {
                 tab.addEventListener('click', function() {
-                    document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
+                    dashboardPeriodTabs.forEach(t => t.classList.remove('active'));
                     this.classList.add('active');
                     updateUI();
                 });
