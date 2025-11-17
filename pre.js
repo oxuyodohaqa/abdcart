@@ -15,23 +15,6 @@ const CONFIG = {
     receiptsDir: 'receipts',
     outputFile: 'sukses.txt',
     maxConcurrent: 200,
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-const { URL } = require('url');
-const FormData = require('form-data');
-const tough = require('tough-cookie');
-const { wrapper } = require('axios-cookiejar-support');
-const chalk = require('chalk');
-const readline = require('readline');
-const https = require('https');
-
-// CONFIGURATION
-const CONFIG = {
-    studentsFile: 'students.txt',
-    receiptsDir: 'receipts',
-    outputFile: 'sukses.txt',
-    maxConcurrent: 200,
     batchSize: 200,
     timeout: 30000,
     uploadTimeout: 30000,
@@ -92,8 +75,9 @@ function getPreferredProxyUrl() {
         return null;
     }
 
-    if (CONFIG.network.proxyUrl?.trim()) {
-        return CONFIG.network.proxyUrl.trim();
+    const configuredProxy = CONFIG.network.proxyUrl ? CONFIG.network.proxyUrl.trim() : '';
+    if (configuredProxy) {
+        return configuredProxy;
     }
 
     if (!CONFIG.network.allowEnvProxy) {
@@ -141,7 +125,7 @@ function splitHostAndPort(entry) {
 }
 
 function shouldBypassProxy(hostname, port = '') {
-    const host = hostname?.toLowerCase();
+    const host = hostname ? hostname.toLowerCase() : '';
     const normalizedPort = port ? String(port) : '';
     if (!host) return false;
 
@@ -200,8 +184,9 @@ function buildProxyConfig(targetUrl) {
             return null;
         }
 
+        const proxyProtocol = parsedProxy.protocol ? parsedProxy.protocol.replace(':', '') : '';
         const proxyConfig = {
-            protocol: parsedProxy.protocol?.replace(':', '') || 'http',
+            protocol: proxyProtocol || 'http',
             host: parsedProxy.hostname,
             port: parsedProxy.port ? parseInt(parsedProxy.port, 10) : (parsedProxy.protocol === 'https:' ? 443 : 80)
         };
@@ -222,35 +207,6 @@ function buildProxyConfig(targetUrl) {
         return null;
     }
 }
-    autoDeleteProcessed: true,
-    retryAllFilesOnFailure: true,
-    network: {
-        /**
-         * Optional proxy URL. Will be set automatically when the user opts-in to
-         * the built-in per-country proxies during startup.
-         */
-        proxyUrl: '',
-        /**
-         * Comma-separated host list that should never use the proxy.
-         */
-        noProxy: '',
-        /**
-         * Environment-driven proxy configuration is disabled – users are
-         * prompted instead.
-         */
-        allowEnvProxy: false,
-        /**
-         * When true, axios will always bypass proxies. This flag is flipped
-         * based on the startup prompt.
-         */
-        forceDisableProxy: false,
-        /**
-         * Some forward proxies terminate TLS and present their own certificates.
-         * Enable this flag to relax HTTPS verification when a proxy is active.
-         */
-        relaxHttpsVerification: false
-    }
-};
 
 const BUILT_IN_PROXY_TEMPLATE = {
     usernamePrefix: 'ffff3162f4aa205c0326__cr.',
@@ -987,6 +943,38 @@ async function promptProxyPreference(countryConfig) {
 function getBuiltInCountryProxyUrl(countryCode) {
     if (!countryCode) return null;
     const code = countryCode.toUpperCase();
+    const overrides = BUILT_IN_PROXY_TEMPLATE.suffixOverrides || {};
+    const suffix = overrides[code] || code.toLowerCase();
+    const username = `${BUILT_IN_PROXY_TEMPLATE.usernamePrefix}${suffix}`;
+    return `http://${username}:${BUILT_IN_PROXY_TEMPLATE.password}@${BUILT_IN_PROXY_TEMPLATE.host}:${BUILT_IN_PROXY_TEMPLATE.port}`;
+}
+
+async function promptProxyPreference(countryConfig) {
+    console.log(chalk.cyan('\n🌐 PROXY SELECTION'));
+    console.log(chalk.gray('   Built-in proxies are available for every supported country.'));
+    console.log(chalk.gray('   Choose whether to route traffic through the proxy or use a direct connection.'));
+
+    const answer = (await askQuestion(chalk.blue(`\nUse the built-in proxy for ${countryConfig.flag} ${countryConfig.name}? (y/N): `))).trim().toLowerCase();
+
+    if (answer === 'y' || answer === 'yes') {
+        const proxyUrl = getBuiltInCountryProxyUrl(countryConfig.code);
+        CONFIG.network.proxyUrl = proxyUrl;
+        CONFIG.network.forceDisableProxy = false;
+        CONFIG.network.allowEnvProxy = false;
+        CONFIG.network.relaxHttpsVerification = true;
+        console.log(chalk.green(`✅ Proxy enabled: ${proxyUrl}`));
+        console.log(chalk.yellow('⚠️ HTTPS certificate checks relaxed for proxy connection.'));
+    } else {
+        CONFIG.network.proxyUrl = '';
+        CONFIG.network.forceDisableProxy = true;
+        CONFIG.network.relaxHttpsVerification = false;
+        console.log(chalk.yellow('🚫 Proxy disabled: Direct connection will be used.'));
+    }
+}
+
+function getBuiltInCountryProxyUrl(countryCode) {
+    if (!countryCode) return null;
+    const code = countryCode.toUpperCase();
     const suffix = COUNTRY_PROXY_SUFFIX_OVERRIDES[code] || code.toLowerCase();
     const username = `${BUILT_IN_PROXY_TEMPLATE.usernamePrefix}${suffix}`;
     return `http://${username}:${BUILT_IN_PROXY_TEMPLATE.password}@${BUILT_IN_PROXY_TEMPLATE.host}:${BUILT_IN_PROXY_TEMPLATE.port}`;
@@ -1349,7 +1337,11 @@ class ExactJsonCollegeMatcher {
     }
     
     getCollegeName(collegeId) {
-        return this.collegesMap.get(collegeId)?.name || 'Unknown';
+        const college = this.collegesMap.get(collegeId);
+        if (college && college.name) {
+            return college.name;
+        }
+        return 'Unknown';
     }
     
     incrementUploadRetry() {
@@ -1521,75 +1513,6 @@ class VerificationSession {
 
         return client;
     }
-class VerificationSession {
-    constructor(id, countryConfig) {
-        this.id = id;
-        this.countryConfig = countryConfig;
-        this.cookieJar = new tough.CookieJar();
-        this.userAgent = this.getRandomUserAgent();
-        this.verificationId = null;
-        this.client = this.createClient();
-        this.requestCount = 0;
-        this.currentStep = 'init';
-        this.submittedCollegeId = null;
-        this.uploadAttempts = [];
-        this.proxyInfo = null;
-    }
-
-    createClient() {
-        const config = {
-            jar: this.cookieJar,
-            timeout: CONFIG.timeout,
-            maxRedirects: 3,
-            validateStatus: (status) => status < 500,
-            headers: {
-                'User-Agent': this.userAgent,
-                'Accept': 'application/json, text/html, application/xhtml+xml, */*',
-                'Accept-Language': `${this.countryConfig.locale},en;q=0.9`,
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Connection': 'keep-alive',
-                'DNT': '1',
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache',
-                'X-Country': this.countryConfig.code.toUpperCase(),
-                'X-Locale': this.countryConfig.locale
-            }
-        };
-
-        const proxyConfig = buildProxyConfig(this.countryConfig.sheeridUrl);
-
-        if (proxyConfig === false) {
-            config.proxy = false;
-            this.proxyInfo = 'DIRECT (proxy bypass)';
-        } else if (proxyConfig) {
-            const axiosProxyConfig = {
-                host: proxyConfig.host,
-                port: proxyConfig.port
-            };
-            if (proxyConfig.auth) {
-                axiosProxyConfig.auth = proxyConfig.auth;
-            }
-            config.proxy = axiosProxyConfig;
-            this.proxyInfo = `${proxyConfig.protocol || 'http'}://${proxyConfig.host}:${proxyConfig.port}`;
-        }
-
-        if (CONFIG.network.relaxHttpsVerification) {
-            config.httpsAgent = new https.Agent({
-                rejectUnauthorized: false,
-                keepAlive: true
-            });
-        }
-
-        const client = wrapper(axios.create(config));
-
-        if (this.proxyInfo) {
-            console.log(`[${this.id}] 🌐 [${this.countryConfig.flag}] Proxy: ${this.proxyInfo}`);
-        } else if (CONFIG.network.forceDisableProxy) {
-            console.log(`[${this.id}] 🌐 [${this.countryConfig.flag}] Proxy disabled (forced)`);
-        }
-
-        return client;
-    }
     
     getRandomUserAgent() {
         return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
@@ -1649,9 +1572,10 @@ class VerificationSession {
             
             this.requestCount++;
             
-            if (response.data?.verificationId) {
-                this.verificationId = response.data.verificationId;
-                this.currentStep = response.data.currentStep || 'collectStudentPersonalInfo';
+            const responseData = response.data || {};
+            if (responseData.verificationId) {
+                this.verificationId = responseData.verificationId;
+                this.currentStep = responseData.currentStep || 'collectStudentPersonalInfo';
             } else {
                 this.verificationId = this.generateVerificationId();
                 this.currentStep = 'collectStudentPersonalInfo';
@@ -1846,7 +1770,8 @@ class VerificationSession {
                     return { status: 'SUCCESS', data, waitTime: i+1 };
                 }
                 
-                if (data.rejectionReasons?.length > 0) {
+                const rejectionReasons = data.rejectionReasons || [];
+                if (rejectionReasons.length > 0) {
                     console.log(`[${this.id}] ❌ [${this.countryConfig.flag}] Verification REJECTED after ${i+1} seconds`);
                     return { status: 'REJECTED', data, waitTime: i+1 };
                 }
@@ -1872,7 +1797,8 @@ class VerificationSession {
         for (const endpoint of endpoints) {
             try {
                 const response = await this.client.get(endpoint, { maxRedirects: 0 });
-                let url = response.headers.location || response.data?.redirectUrl;
+                const redirectUrl = response.data && response.data.redirectUrl;
+                let url = response.headers.location || redirectUrl;
                 
                 if (url && url.includes('spotify.com')) {
                     if (!url.includes('verificationId=')) {
@@ -1882,8 +1808,10 @@ class VerificationSession {
                     return url;
                 }
             } catch (error) {
-                if (error.response?.headers?.location?.includes('spotify.com')) {
-                    let url = error.response.headers.location;
+                const errorResponse = error.response;
+                const redirectHeader = errorResponse && errorResponse.headers ? errorResponse.headers.location : undefined;
+                if (redirectHeader && redirectHeader.includes('spotify.com')) {
+                    let url = redirectHeader;
                     if (!url.includes('verificationId=')) {
                         const separator = url.includes('?') ? '&' : '?';
                         url = `${url}${separator}verificationId=${this.verificationId}`;
@@ -2464,15 +2392,6 @@ async function main() {
     
     try {
         // SELECT COUNTRY
-        const selectedCountryCode = await selectCountry();
-        const countryConfig = COUNTRIES[selectedCountryCode];
-
-        CONFIG.selectedCountry = selectedCountryCode;
-        CONFIG.countryConfig = countryConfig;
-
-        await promptProxyPreference(countryConfig);
-
-        console.log(chalk.green(`\n✅ Selected Country: ${countryConfig.flag} ${countryConfig.name} (${countryConfig.code.toUpperCase()})`));
         const selectedCountryCode = await selectCountry();
         const countryConfig = COUNTRIES[selectedCountryCode];
 
