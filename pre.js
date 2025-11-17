@@ -31,25 +31,36 @@ const CONFIG = {
     retryAllFilesOnFailure: true,
     network: {
         /**
-         * Optional proxy URL.
-         * Supported formats:
-         *   http://user:pass@host:port
-         *   https://host:port
+         * Optional proxy URL. Will be set automatically when the user opts-in to
+         * the built-in per-country proxies during startup.
          */
-        proxyUrl: process.env.SHEERID_PROXY || '',
+        proxyUrl: '',
         /**
          * Comma-separated host list that should never use the proxy.
          */
-        noProxy: process.env.SHEERID_NO_PROXY || '',
+        noProxy: '',
         /**
-         * Respect NO_PROXY/HTTP(S)_PROXY environment variables by default.
+         * Environment-driven proxy configuration is disabled – users are
+         * prompted instead.
          */
-        allowEnvProxy: process.env.SHEERID_ALLOW_ENV_PROXY !== '0',
+        allowEnvProxy: false,
         /**
-         * When set to true (or SHEERID_DISABLE_PROXY=1), always bypass proxies.
+         * When true, axios will always bypass proxies. This flag is flipped
+         * based on the startup prompt.
          */
-        forceDisableProxy: process.env.SHEERID_DISABLE_PROXY === '1'
+        forceDisableProxy: false
     }
+};
+
+const BUILT_IN_PROXY_TEMPLATE = {
+    usernamePrefix: 'ffff3162f4aa205c0326__cr.',
+    password: 'e3f079bb220c14b6',
+    host: 'gw.dataimpulse.com',
+    port: 823
+};
+
+const COUNTRY_PROXY_SUFFIX_OVERRIDES = {
+    IN: 'ine'
 };
 
 let proxyValidationErrorLogged = false;
@@ -597,6 +608,34 @@ function askQuestion(query) {
             resolve(answer);
         });
     });
+}
+
+function getBuiltInCountryProxyUrl(countryCode) {
+    if (!countryCode) return null;
+    const code = countryCode.toUpperCase();
+    const suffix = COUNTRY_PROXY_SUFFIX_OVERRIDES[code] || code.toLowerCase();
+    const username = `${BUILT_IN_PROXY_TEMPLATE.usernamePrefix}${suffix}`;
+    return `http://${username}:${BUILT_IN_PROXY_TEMPLATE.password}@${BUILT_IN_PROXY_TEMPLATE.host}:${BUILT_IN_PROXY_TEMPLATE.port}`;
+}
+
+async function promptProxyPreference(countryConfig) {
+    console.log(chalk.cyan('\n🌐 PROXY SELECTION'));
+    console.log(chalk.gray('   Built-in proxies are available for every supported country.'));
+    console.log(chalk.gray('   Choose whether to route traffic through the proxy or use a direct connection.'));
+
+    const answer = (await askQuestion(chalk.blue(`\nUse the built-in proxy for ${countryConfig.flag} ${countryConfig.name}? (y/N): `))).trim().toLowerCase();
+
+    if (answer === 'y' || answer === 'yes') {
+        const proxyUrl = getBuiltInCountryProxyUrl(countryConfig.code);
+        CONFIG.network.proxyUrl = proxyUrl;
+        CONFIG.network.forceDisableProxy = false;
+        CONFIG.network.allowEnvProxy = false;
+        console.log(chalk.green(`✅ Proxy enabled: ${proxyUrl}`));
+    } else {
+        CONFIG.network.proxyUrl = '';
+        CONFIG.network.forceDisableProxy = true;
+        console.log(chalk.yellow('🚫 Proxy disabled: Direct connection will be used.'));
+    }
 }
 
 // COUNTRY SELECTOR
@@ -1946,10 +1985,12 @@ async function main() {
         // SELECT COUNTRY
         const selectedCountryCode = await selectCountry();
         const countryConfig = COUNTRIES[selectedCountryCode];
-        
+
         CONFIG.selectedCountry = selectedCountryCode;
         CONFIG.countryConfig = countryConfig;
-        
+
+        await promptProxyPreference(countryConfig);
+
         console.log(chalk.green(`\n✅ Selected Country: ${countryConfig.flag} ${countryConfig.name} (${countryConfig.code.toUpperCase()})`));
         console.log(chalk.blue(`🆔 Program ID: ${countryConfig.programId}`));
         console.log(chalk.blue(`📚 Using colleges file: ${countryConfig.collegesFile}`));
