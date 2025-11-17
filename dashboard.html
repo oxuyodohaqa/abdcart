@@ -3133,6 +3133,7 @@ let products = [];
 let subscriptionProducts = [];
 let accounts = []; // Store streaming service accounts
 let selectedProfile = null;
+let lastProductNameForAccountFilter = '';
 let realAdmins = []; // Store real admins from Firebase
 let commissionBrackets = []; // Store commission bracket configuration
     let settings = {
@@ -3676,7 +3677,7 @@ function loadAllData() {
     // Load accounts (for profile tracking)
     getRef('accounts').on('value', (snapshot) => {
         const accountsData = snapshot.val() || {};
-        accounts = Object.values(accountsData);
+        accounts = Object.values(accountsData).map(account => ensureAccountCategory(account));
         console.log('🎬 Loaded accounts:', accounts.length);
         populateAccountDropdown();
         if (currentSession.role === 'owner') {
@@ -4209,21 +4210,29 @@ function updateProductDropdown() {
             handleProductChangeForProfileTracking(productId);
         });
 
+        const accountSelectElement = document.getElementById('accountIdSelect');
+        if (accountSelectElement) {
+            accountSelectElement.addEventListener('change', handleAccountSelectionChange);
+        }
+
         // Handle product selection for profile tracking
         function handleProductChangeForProfileTracking(productId) {
             const product = products.find(p => p.id === productId);
             if (!product) {
                 document.getElementById('profileTrackingFields').style.display = 'none';
+                lastProductNameForAccountFilter = '';
                 return;
             }
-            
+
             // Check if product is a streaming service
             const isStreaming = STREAMING_CATEGORIES.includes(product.category);
-            
+
             if (isStreaming) {
+                lastProductNameForAccountFilter = product.name;
                 document.getElementById('profileTrackingFields').style.display = 'block';
                 populateAccountDropdown(product.name);
             } else {
+                lastProductNameForAccountFilter = '';
                 document.getElementById('profileTrackingFields').style.display = 'none';
             }
         }
@@ -4231,6 +4240,8 @@ function updateProductDropdown() {
         // Populate account dropdown based on product name
         function populateAccountDropdown(productName) {
             const accountSelect = document.getElementById('accountIdSelect');
+            const profileSelect = document.getElementById('profileNumberSelect');
+            const profileStatusDisplay = document.getElementById('profileStatusDisplay');
             if (!accountSelect) return;
 
             accountSelect.innerHTML = '<option value="">-- Select Account --</option>';
@@ -4241,32 +4252,76 @@ function updateProductDropdown() {
                 return (acc.product || '').toLowerCase() === normalizedProduct;
             });
             filteredAccounts.forEach(account => {
-                accountSelect.innerHTML += `<option value="${account.id}">${account.id} - ${account.product}</option>`;
+                const statusLabel = account.status === 'yes' ? 'Sold' : 'In Stock';
+                accountSelect.innerHTML += `<option value="${account.id}">${account.id} - ${account.product} (${statusLabel})</option>`;
             });
 
             if (filteredAccounts.length === 0) {
                 accountSelect.innerHTML += '<option value="" disabled>No accounts available - Create one first</option>';
             }
+
+            if (previousSelection && filteredAccounts.some(account => account.id === previousSelection)) {
+                accountSelect.value = previousSelection;
+            }
+
+            handleAccountSelectionChange();
+        }
+
+        function handleAccountSelectionChange() {
+            const accountSelect = document.getElementById('accountIdSelect');
+            const profileSelect = document.getElementById('profileNumberSelect');
+            if (!accountSelect || !profileSelect) return;
+
+            const selectedAccount = accounts.find(acc => acc.id === accountSelect.value);
+            profileSelect.innerHTML = '<option value="">-- Select Profile --</option>';
+
+            if (!selectedAccount) {
+                updateProfileStatus();
+                return;
+            }
+
+            const totalProfiles = selectedAccount.totalProfiles || 0;
+            const profileCount = Math.max(totalProfiles, 1);
+            for (let i = 1; i <= profileCount; i++) {
+                profileSelect.innerHTML += `<option value="${i}">Profile ${i}</option>`;
+            }
+
+            const accountProfileType = (selectedAccount.profileType || '').toLowerCase();
+            if (accountProfileType === 'solo') {
+                const soloRadio = document.getElementById('profileTypeSolo');
+                if (soloRadio) soloRadio.checked = true;
+            } else if (accountProfileType === 'shared') {
+                const sharedRadio = document.getElementById('profileTypeShared');
+                if (sharedRadio) sharedRadio.checked = true;
+            }
+
+            updateProfileStatus();
         }
 
         // Update profile status when profile is selected
         function updateProfileStatus() {
             const accountId = document.getElementById('accountIdSelect').value;
             const profileNumber = document.getElementById('profileNumberSelect').value;
-            const profileType = document.querySelector('input[name="profileType"]:checked')?.value;
-            
+            const profileTypeSelection = document.querySelector('input[name="profileType"]:checked')?.value;
+            const selectedAccount = accounts.find(acc => acc.id === accountId);
+
             if (!accountId || !profileNumber) {
                 document.getElementById('profileStatusDisplay').style.display = 'none';
                 return;
             }
-            
+
+            if (!selectedAccount) {
+                document.getElementById('profileStatusDisplay').style.display = 'none';
+                return;
+            }
+
             // Find sales for this account and profile
-            const existingSales = sales.filter(s => 
-                s.accountId === accountId && 
+            const existingSales = sales.filter(s =>
+                s.accountId === accountId &&
                 s.profileNumber === parseInt(profileNumber)
             );
-            
-            const maxSlots = profileType === 'Solo' ? 1 : 2;
+
+            const maxSlots = getAccountSlotsPerProfile(selectedAccount, profileTypeSelection || 'Solo');
             const filledSlots = existingSales.length;
             const availableSlots = maxSlots - filledSlots;
             
@@ -4607,7 +4662,8 @@ function deleteSale(saleId, saleUserId = null) {
                 const profileNumber = document.getElementById('profileNumberSelect').value;
                 const profileType = document.querySelector('input[name="profileType"]:checked');
                 const soldBy = document.getElementById('soldBySelect').value;
-                
+                const selectedAccount = accounts.find(acc => acc.id === accountId);
+
                 if (!accountId) {
                     showToast('⚠️ Please select an account', 'error');
                     return;
@@ -4630,27 +4686,31 @@ function deleteSale(saleId, saleUserId = null) {
                     showToast('⚠️ Please enter account email', 'error');
                     return;
                 }
-                
+
                 // Basic email validation
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                 if (!emailRegex.test(accountEmail)) {
                     showToast('⚠️ Please enter a valid email address', 'error');
                     return;
                 }
+                if (!selectedAccount) {
+                    showToast('❌ Selected account could not be found. Please refresh.', 'error');
+                    return;
+                }
                 if (!profileType) {
                     showToast('⚠️ Please select profile type (Solo or Shared)', 'error');
                     return;
                 }
-                
+
                 if (!soldBy) {
                     showToast('⚠️ Please select who sold this', 'error');
                     return;
                 }
-                
+
                 // Check for overselling - validate slot availability
-                const maxSlots = profileType.value === 'Solo' ? 1 : 2;
-                const existingSales = sales.filter(s => 
-                    s.accountId === accountId && 
+                const maxSlots = getAccountSlotsPerProfile(selectedAccount, profileType.value);
+                const existingSales = sales.filter(s =>
+                    s.accountId === accountId &&
                     s.profileNumber === parseInt(profileNumber)
                 );
                 
