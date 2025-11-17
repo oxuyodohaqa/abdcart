@@ -15,6 +15,23 @@ const CONFIG = {
     receiptsDir: 'receipts',
     outputFile: 'sukses.txt',
     maxConcurrent: 200,
+const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
+const { URL } = require('url');
+const FormData = require('form-data');
+const tough = require('tough-cookie');
+const { wrapper } = require('axios-cookiejar-support');
+const chalk = require('chalk');
+const readline = require('readline');
+const https = require('https');
+
+// CONFIGURATION
+const CONFIG = {
+    studentsFile: 'students.txt',
+    receiptsDir: 'receipts',
+    outputFile: 'sukses.txt',
+    maxConcurrent: 200,
     batchSize: 200,
     timeout: 30000,
     uploadTimeout: 30000,
@@ -66,6 +83,326 @@ const BUILT_IN_PROXY_TEMPLATE = {
     suffixOverrides: Object.freeze({
         IN: 'ine'
     })
+};
+
+let proxyValidationErrorLogged = false;
+
+function getPreferredProxyUrl() {
+    if (CONFIG.network.forceDisableProxy) {
+        return null;
+    }
+
+    if (CONFIG.network.proxyUrl?.trim()) {
+        return CONFIG.network.proxyUrl.trim();
+    }
+
+    if (!CONFIG.network.allowEnvProxy) {
+        return null;
+    }
+
+    return process.env.SHEERID_PROXY || process.env.HTTPS_PROXY || process.env.HTTP_PROXY || null;
+}
+
+function getNoProxyList() {
+    const entries = [];
+    if (CONFIG.network.noProxy) {
+        entries.push(CONFIG.network.noProxy);
+    }
+    if (CONFIG.network.allowEnvProxy && process.env.NO_PROXY) {
+        entries.push(process.env.NO_PROXY);
+    }
+    return entries
+        .join(',')
+        .split(',')
+        .map(entry => entry.trim())
+        .filter(Boolean);
+}
+
+function splitHostAndPort(entry) {
+    if (entry.startsWith('[')) {
+        const closingIndex = entry.indexOf(']');
+        if (closingIndex !== -1) {
+            const host = entry.slice(1, closingIndex);
+            const remainder = entry.slice(closingIndex + 1);
+            if (remainder.startsWith(':')) {
+                return [host, remainder.slice(1)];
+            }
+            return [host, undefined];
+        }
+    }
+
+    const parts = entry.split(':');
+    if (parts.length === 2) {
+        return parts;
+    }
+
+    // If there are multiple colons (likely IPv6 without brackets), treat entire entry as host.
+    return [entry, undefined];
+}
+
+function shouldBypassProxy(hostname, port = '') {
+    const host = hostname?.toLowerCase();
+    const normalizedPort = port ? String(port) : '';
+    if (!host) return false;
+
+    const noProxyEntries = getNoProxyList();
+    if (noProxyEntries.length === 0) return false;
+
+    return noProxyEntries.some(entry => {
+        if (entry === '*') return true;
+
+        const [patternHost, patternPort] = splitHostAndPort(entry);
+        if (!patternHost) return false;
+
+        let normalizedPattern = patternHost.toLowerCase();
+        if (normalizedPattern.startsWith('*.')) {
+            normalizedPattern = normalizedPattern.slice(1);
+        }
+        const isWildcard = normalizedPattern.startsWith('.');
+
+        if (isWildcard) {
+            const suffix = normalizedPattern.slice(1);
+            return host === suffix || host.endsWith(normalizedPattern);
+        }
+
+        if (patternPort) {
+            return host === normalizedPattern && normalizedPort === patternPort;
+        }
+
+        return host === normalizedPattern;
+    });
+}
+
+function buildProxyConfig(targetUrl) {
+    const proxyUrl = getPreferredProxyUrl();
+
+    if (!proxyUrl) {
+        return CONFIG.network.forceDisableProxy ? false : null;
+    }
+
+    let targetHost = null;
+    let targetPort = '';
+    try {
+        const parsedTarget = new URL(targetUrl);
+        targetHost = parsedTarget.hostname;
+        targetPort = parsedTarget.port || (parsedTarget.protocol === 'https:' ? '443' : '80');
+    } catch (error) {
+        targetHost = null;
+    }
+
+    if (targetHost && shouldBypassProxy(targetHost, targetPort)) {
+        return false;
+    }
+
+    try {
+        const parsedProxy = new URL(proxyUrl);
+        if (!parsedProxy.hostname) {
+            return null;
+        }
+
+        const proxyConfig = {
+            protocol: parsedProxy.protocol?.replace(':', '') || 'http',
+            host: parsedProxy.hostname,
+            port: parsedProxy.port ? parseInt(parsedProxy.port, 10) : (parsedProxy.protocol === 'https:' ? 443 : 80)
+        };
+
+        if (parsedProxy.username || parsedProxy.password) {
+            proxyConfig.auth = {
+                username: decodeURIComponent(parsedProxy.username || ''),
+                password: decodeURIComponent(parsedProxy.password || '')
+            };
+        }
+
+        return proxyConfig;
+    } catch (error) {
+        if (!proxyValidationErrorLogged) {
+            console.log(chalk.yellow(`⚠️ Invalid proxy URL (${proxyUrl}): ${error.message}`));
+            proxyValidationErrorLogged = true;
+        }
+        return null;
+    }
+}
+    autoDeleteProcessed: true,
+    retryAllFilesOnFailure: true,
+    network: {
+        /**
+         * Optional proxy URL. Will be set automatically when the user opts-in to
+         * the built-in per-country proxies during startup.
+         */
+        proxyUrl: '',
+        /**
+         * Comma-separated host list that should never use the proxy.
+         */
+        noProxy: '',
+        /**
+         * Environment-driven proxy configuration is disabled – users are
+         * prompted instead.
+         */
+        allowEnvProxy: false,
+        /**
+         * When true, axios will always bypass proxies. This flag is flipped
+         * based on the startup prompt.
+         */
+        forceDisableProxy: false,
+        /**
+         * Some forward proxies terminate TLS and present their own certificates.
+         * Enable this flag to relax HTTPS verification when a proxy is active.
+         */
+        relaxHttpsVerification: false
+    }
+};
+
+const BUILT_IN_PROXY_TEMPLATE = {
+    usernamePrefix: 'ffff3162f4aa205c0326__cr.',
+    password: 'e3f079bb220c14b6',
+    host: 'gw.dataimpulse.com',
+    port: 823
+};
+
+const COUNTRY_PROXY_SUFFIX_OVERRIDES = {
+    IN: 'ine'
+};
+
+let proxyValidationErrorLogged = false;
+
+function getPreferredProxyUrl() {
+    if (CONFIG.network.forceDisableProxy) {
+        return null;
+    }
+
+    if (CONFIG.network.proxyUrl?.trim()) {
+        return CONFIG.network.proxyUrl.trim();
+    }
+
+    if (!CONFIG.network.allowEnvProxy) {
+        return null;
+    }
+
+    return process.env.SHEERID_PROXY || process.env.HTTPS_PROXY || process.env.HTTP_PROXY || null;
+}
+
+function getNoProxyList() {
+    const entries = [];
+    if (CONFIG.network.noProxy) {
+        entries.push(CONFIG.network.noProxy);
+    }
+    if (CONFIG.network.allowEnvProxy && process.env.NO_PROXY) {
+        entries.push(process.env.NO_PROXY);
+    }
+    return entries
+        .join(',')
+        .split(',')
+        .map(entry => entry.trim())
+        .filter(Boolean);
+}
+
+function splitHostAndPort(entry) {
+    if (entry.startsWith('[')) {
+        const closingIndex = entry.indexOf(']');
+        if (closingIndex !== -1) {
+            const host = entry.slice(1, closingIndex);
+            const remainder = entry.slice(closingIndex + 1);
+            if (remainder.startsWith(':')) {
+                return [host, remainder.slice(1)];
+            }
+            return [host, undefined];
+        }
+    }
+
+    const parts = entry.split(':');
+    if (parts.length === 2) {
+        return parts;
+    }
+
+    // If there are multiple colons (likely IPv6 without brackets), treat entire entry as host.
+    return [entry, undefined];
+}
+
+function shouldBypassProxy(hostname, port = '') {
+    const host = hostname?.toLowerCase();
+    const normalizedPort = port ? String(port) : '';
+    if (!host) return false;
+
+    const noProxyEntries = getNoProxyList();
+    if (noProxyEntries.length === 0) return false;
+
+    return noProxyEntries.some(entry => {
+        if (entry === '*') return true;
+
+        const [patternHost, patternPort] = splitHostAndPort(entry);
+        if (!patternHost) return false;
+
+        let normalizedPattern = patternHost.toLowerCase();
+        if (normalizedPattern.startsWith('*.')) {
+            normalizedPattern = normalizedPattern.slice(1);
+        }
+        const isWildcard = normalizedPattern.startsWith('.');
+
+        if (isWildcard) {
+            const suffix = normalizedPattern.slice(1);
+            return host === suffix || host.endsWith(normalizedPattern);
+        }
+
+        if (patternPort) {
+            return host === normalizedPattern && normalizedPort === patternPort;
+        }
+
+        return host === normalizedPattern;
+    });
+}
+
+function buildProxyConfig(targetUrl) {
+    const proxyUrl = getPreferredProxyUrl();
+
+    if (!proxyUrl) {
+        return CONFIG.network.forceDisableProxy ? false : null;
+    }
+
+    let targetHost = null;
+    let targetPort = '';
+    try {
+        const parsedTarget = new URL(targetUrl);
+        targetHost = parsedTarget.hostname;
+        targetPort = parsedTarget.port || (parsedTarget.protocol === 'https:' ? '443' : '80');
+    } catch (error) {
+        targetHost = null;
+    }
+
+    if (targetHost && shouldBypassProxy(targetHost, targetPort)) {
+        return false;
+    }
+
+    try {
+        const parsedProxy = new URL(proxyUrl);
+        if (!parsedProxy.hostname) {
+            return null;
+        }
+
+        const proxyConfig = {
+            protocol: parsedProxy.protocol?.replace(':', '') || 'http',
+            host: parsedProxy.hostname,
+            port: parsedProxy.port ? parseInt(parsedProxy.port, 10) : (parsedProxy.protocol === 'https:' ? 443 : 80)
+        };
+
+        if (parsedProxy.username || parsedProxy.password) {
+            proxyConfig.auth = {
+                username: decodeURIComponent(parsedProxy.username || ''),
+                password: decodeURIComponent(parsedProxy.password || '')
+            };
+        }
+
+        return proxyConfig;
+    } catch (error) {
+        if (!proxyValidationErrorLogged) {
+            console.log(chalk.yellow(`⚠️ Invalid proxy URL (${proxyUrl}): ${error.message}`));
+            proxyValidationErrorLogged = true;
+        }
+        return null;
+    }
+}
+
+const COUNTRY_PROXY_SUFFIX_OVERRIDES = {
+    IN: 'ine'
 };
 
 let proxyValidationErrorLogged = false;
@@ -647,6 +984,65 @@ async function promptProxyPreference(countryConfig) {
     }
 }
 
+function getBuiltInCountryProxyUrl(countryCode) {
+    if (!countryCode) return null;
+    const code = countryCode.toUpperCase();
+    const suffix = COUNTRY_PROXY_SUFFIX_OVERRIDES[code] || code.toLowerCase();
+    const username = `${BUILT_IN_PROXY_TEMPLATE.usernamePrefix}${suffix}`;
+    return `http://${username}:${BUILT_IN_PROXY_TEMPLATE.password}@${BUILT_IN_PROXY_TEMPLATE.host}:${BUILT_IN_PROXY_TEMPLATE.port}`;
+}
+
+async function promptProxyPreference(countryConfig) {
+    console.log(chalk.cyan('\n🌐 PROXY SELECTION'));
+    console.log(chalk.gray('   Built-in proxies are available for every supported country.'));
+    console.log(chalk.gray('   Choose whether to route traffic through the proxy or use a direct connection.'));
+
+    const answer = (await askQuestion(chalk.blue(`\nUse the built-in proxy for ${countryConfig.flag} ${countryConfig.name}? (y/N): `))).trim().toLowerCase();
+
+    if (answer === 'y' || answer === 'yes') {
+        const proxyUrl = getBuiltInCountryProxyUrl(countryConfig.code);
+        CONFIG.network.proxyUrl = proxyUrl;
+        CONFIG.network.forceDisableProxy = false;
+        CONFIG.network.allowEnvProxy = false;
+        CONFIG.network.relaxHttpsVerification = true;
+        console.log(chalk.green(`✅ Proxy enabled: ${proxyUrl}`));
+        console.log(chalk.yellow('⚠️ HTTPS certificate checks relaxed for proxy connection.'));
+    } else {
+        CONFIG.network.proxyUrl = '';
+        CONFIG.network.forceDisableProxy = true;
+        CONFIG.network.relaxHttpsVerification = false;
+        console.log(chalk.yellow('🚫 Proxy disabled: Direct connection will be used.'));
+    }
+}
+
+function getBuiltInCountryProxyUrl(countryCode) {
+    if (!countryCode) return null;
+    const code = countryCode.toUpperCase();
+    const suffix = COUNTRY_PROXY_SUFFIX_OVERRIDES[code] || code.toLowerCase();
+    const username = `${BUILT_IN_PROXY_TEMPLATE.usernamePrefix}${suffix}`;
+    return `http://${username}:${BUILT_IN_PROXY_TEMPLATE.password}@${BUILT_IN_PROXY_TEMPLATE.host}:${BUILT_IN_PROXY_TEMPLATE.port}`;
+}
+
+async function promptProxyPreference(countryConfig) {
+    console.log(chalk.cyan('\n🌐 PROXY SELECTION'));
+    console.log(chalk.gray('   Built-in proxies are available for every supported country.'));
+    console.log(chalk.gray('   Choose whether to route traffic through the proxy or use a direct connection.'));
+
+    const answer = (await askQuestion(chalk.blue(`\nUse the built-in proxy for ${countryConfig.flag} ${countryConfig.name}? (y/N): `))).trim().toLowerCase();
+
+    if (answer === 'y' || answer === 'yes') {
+        const proxyUrl = getBuiltInCountryProxyUrl(countryConfig.code);
+        CONFIG.network.proxyUrl = proxyUrl;
+        CONFIG.network.forceDisableProxy = false;
+        CONFIG.network.allowEnvProxy = false;
+        console.log(chalk.green(`✅ Proxy enabled: ${proxyUrl}`));
+    } else {
+        CONFIG.network.proxyUrl = '';
+        CONFIG.network.forceDisableProxy = true;
+        console.log(chalk.yellow('🚫 Proxy disabled: Direct connection will be used.'));
+    }
+}
+
 // COUNTRY SELECTOR
 async function selectCountry() {
     console.log(chalk.cyan('\n🌍 SELECT COUNTRY FOR SPOTIFY VERIFICATION:'));
@@ -1056,6 +1452,75 @@ class ImmediateDeleteManager {
 }
 
 // VERIFICATION SESSION - LEGIT ONLY
+class VerificationSession {
+    constructor(id, countryConfig) {
+        this.id = id;
+        this.countryConfig = countryConfig;
+        this.cookieJar = new tough.CookieJar();
+        this.userAgent = this.getRandomUserAgent();
+        this.verificationId = null;
+        this.client = this.createClient();
+        this.requestCount = 0;
+        this.currentStep = 'init';
+        this.submittedCollegeId = null;
+        this.uploadAttempts = [];
+        this.proxyInfo = null;
+    }
+
+    createClient() {
+        const config = {
+            jar: this.cookieJar,
+            timeout: CONFIG.timeout,
+            maxRedirects: 3,
+            validateStatus: (status) => status < 500,
+            headers: {
+                'User-Agent': this.userAgent,
+                'Accept': 'application/json, text/html, application/xhtml+xml, */*',
+                'Accept-Language': `${this.countryConfig.locale},en;q=0.9`,
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'DNT': '1',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache',
+                'X-Country': this.countryConfig.code.toUpperCase(),
+                'X-Locale': this.countryConfig.locale
+            }
+        };
+
+        const proxyConfig = buildProxyConfig(this.countryConfig.sheeridUrl);
+
+        if (proxyConfig === false) {
+            config.proxy = false;
+            this.proxyInfo = 'DIRECT (proxy bypass)';
+        } else if (proxyConfig) {
+            const axiosProxyConfig = {
+                host: proxyConfig.host,
+                port: proxyConfig.port
+            };
+            if (proxyConfig.auth) {
+                axiosProxyConfig.auth = proxyConfig.auth;
+            }
+            config.proxy = axiosProxyConfig;
+            this.proxyInfo = `${proxyConfig.protocol || 'http'}://${proxyConfig.host}:${proxyConfig.port}`;
+        }
+
+        if (CONFIG.network.relaxHttpsVerification) {
+            config.httpsAgent = new https.Agent({
+                rejectUnauthorized: false,
+                keepAlive: true
+            });
+        }
+
+        const client = wrapper(axios.create(config));
+
+        if (this.proxyInfo) {
+            console.log(`[${this.id}] 🌐 [${this.countryConfig.flag}] Proxy: ${this.proxyInfo}`);
+        } else if (CONFIG.network.forceDisableProxy) {
+            console.log(`[${this.id}] 🌐 [${this.countryConfig.flag}] Proxy disabled (forced)`);
+        }
+
+        return client;
+    }
 class VerificationSession {
     constructor(id, countryConfig) {
         this.id = id;
@@ -1999,6 +2464,15 @@ async function main() {
     
     try {
         // SELECT COUNTRY
+        const selectedCountryCode = await selectCountry();
+        const countryConfig = COUNTRIES[selectedCountryCode];
+
+        CONFIG.selectedCountry = selectedCountryCode;
+        CONFIG.countryConfig = countryConfig;
+
+        await promptProxyPreference(countryConfig);
+
+        console.log(chalk.green(`\n✅ Selected Country: ${countryConfig.flag} ${countryConfig.name} (${countryConfig.code.toUpperCase()})`));
         const selectedCountryCode = await selectCountry();
         const countryConfig = COUNTRIES[selectedCountryCode];
 
