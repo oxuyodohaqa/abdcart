@@ -5111,42 +5111,49 @@ function calculateStats() {
             }
             
             tbody.innerHTML = filtered.map(sale => {
-                const warrantyClass = sale.warranty === 'FW' ? 'fw' : 'nw';
-                const accountClass = sale.accountType === 'Solo' ? 'solo' : 'shared';
+                const warranty = (sale.warranty || '').toUpperCase();
+                const warrantyClass = warranty === 'FW' ? 'fw' : 'nw';
+                const accountType = sale.accountType === 'Solo' ? 'Solo' : (sale.accountType || 'Shared');
+                const accountClass = accountType === 'Solo' ? 'solo' : 'shared';
                 const soldIcon = sale.sold ? '✅' : '📦';
-                
+
                 // Format profile tracking columns
                 const accountId = sale.accountId || '-';
                 const profileNumber = sale.profileNumber ? `Profile ${sale.profileNumber}` : '-';
                 const slotNumber = sale.slotNumber ? `${sale.slotNumber}/${sale.profileType === 'Solo' ? '1' : '2'}` : '-';
                 const profileName = sale.profileName || '-';
                 const soldBy = sale.soldBy || sale.userName || '-';
-                
-// In renderSalesTable() function, update the table row:
-return `
-    <tr data-sale-id="${sale.id}">
-        <td>${sale.date}</td>
-        ${currentSession.role === 'owner' ? `<td>${sale.userName}</td>` : ''}
-        <td>${sale.productName}</td>
-        <td>${sale.buyerUsername || '-'}</td>
-        <td>${sale.accountEmail || '-'}</td>
-        <td>${accountId}</td>
-        <td>${profileNumber}</td>
-        <td>${slotNumber}</td>
-        <td>${profileName}</td>
-        <td>${soldBy}</td>
-        <td><span class="warranty-badge ${warrantyClass}">${sale.warranty}</span></td>
-        <td><span class="account-type-badge ${accountClass}">${sale.accountType}</span></td>
-        <td>${sale.quantity}</td>
-        <td class="amount-cell">₱${sale.price.toFixed(2)}</td>
-        <td class="amount-cell">₱${sale.totalPrice.toFixed(2)}</td>
-        <td><span class="sold-check">✅</span></td>
-        <td>
-            <button class="action-btn edit-btn" onclick="editSale(${sale.id})">✏️</button>
-            <button class="action-btn delete-btn" onclick="deleteSale('${sale.id}', '${sale.userId}')">🗑️</button>
-        </td>
-    </tr>
-`;
+
+                // Older sales might have prices stored as strings. Normalize before formatting.
+                const quantity = parseInt(sale.quantity, 10) || 1;
+                const price = Number(sale.price) || 0;
+                const totalPrice = Number(sale.totalPrice);
+                const computedTotal = Number.isFinite(totalPrice) ? totalPrice : price * quantity;
+
+                return `
+                    <tr data-sale-id="${sale.id}">
+                        <td>${sale.date || '-'}</td>
+                        ${currentSession.role === 'owner' ? `<td>${sale.userName || '-'}</td>` : ''}
+                        <td>${sale.productName || '-'}</td>
+                        <td>${sale.buyerUsername || '-'}</td>
+                        <td>${sale.accountEmail || '-'}</td>
+                        <td>${accountId}</td>
+                        <td>${profileNumber}</td>
+                        <td>${slotNumber}</td>
+                        <td>${profileName}</td>
+                        <td>${soldBy}</td>
+                        <td><span class="warranty-badge ${warrantyClass}">${warranty || '-'}</span></td>
+                        <td><span class="account-type-badge ${accountClass}">${accountType}</span></td>
+                        <td>${quantity}</td>
+                        <td class="amount-cell">₱${price.toFixed(2)}</td>
+                        <td class="amount-cell">₱${computedTotal.toFixed(2)}</td>
+                        <td><span class="sold-check">${soldIcon}</span></td>
+                        <td>
+                            <button class="action-btn edit-btn" onclick="editSale(${sale.id})">✏️</button>
+                            <button class="action-btn delete-btn" onclick="deleteSale('${sale.id}', '${sale.userId}')">🗑️</button>
+                        </td>
+                    </tr>
+                `;
             }).join('');
         }
 
