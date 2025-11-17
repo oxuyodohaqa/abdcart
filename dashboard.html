@@ -101,13 +101,35 @@
             background: linear-gradient(135deg, #EF4444 0%, #EC4899 50%, #3B82F6 100%);
         }
         
-        body.theme-rainbow { 
+        body.theme-rainbow {
             --primary: #EC4899;
             background: linear-gradient(135deg, #EF4444 0%, #F59E0B 16%, #10B981 33%, #3B82F6 50%, #8B5CF6 66%, #EC4899 83%, #EF4444 100%);
         }
-        
-        body.theme-dark { 
-            --primary: #6366F1; 
+
+        body.theme-clouds {
+            --primary: #60A5FA;
+            --secondary: #E0F2FE;
+            --bg-color: #F8FBFF;
+            --text-color: #0f172a;
+            --card-bg: #ffffff;
+            --light: #F8FBFF;
+            --border-color: #C7D2FE;
+            background: linear-gradient(135deg, #E0F2FE 0%, #F5F3FF 50%, #DBEAFE 100%);
+        }
+
+        body.theme-forest {
+            --primary: #22C55E;
+            --secondary: #84CC16;
+            --bg-color: #052e16;
+            --text-color: #f0fdf4;
+            --card-bg: #134e4a;
+            --light: #DCFCE7;
+            --border-color: #BBF7D0;
+            background: linear-gradient(135deg, #052e16 0%, #166534 50%, #22c55e 100%);
+        }
+
+        body.theme-dark {
+            --primary: #6366F1;
             --bg-color: #0f172a;
             --text-color: #f1f5f9;
             --card-bg: #1e293b;
@@ -115,23 +137,27 @@
             --light: #1e293b;
             background: linear-gradient(135deg, #020617 0%, #0f172a 50%, #1e293b 100%);
         }
-        
-        body.theme-sunshine { 
-            --primary: #FBBF24; 
+
+        body.theme-sunshine {
+            --primary: #FBBF24;
             --secondary: #FEF3C7;
             background: linear-gradient(135deg, #FBBF24 0%, #FDE68A 50%, #FEF3C7 100%);
         }
-        
-        body.theme-mint { 
-            --primary: #10B981; 
+
+        body.theme-mint {
+            --primary: #10B981;
             --secondary: #D1FAE5;
             background: linear-gradient(135deg, #10B981 0%, #6EE7B7 50%, #D1FAE5 100%);
         }
-        
-        body.theme-grape { 
-            --primary: #A855F7; 
+
+        body.theme-grape {
+            --primary: #A855F7;
             --secondary: #F3E8FF;
             background: linear-gradient(135deg, #A855F7 0%, #D8B4FE 50%, #F3E8FF 100%);
+        }
+
+        body.theme-custom {
+            background: linear-gradient(135deg, #fef3c7 0%, #f5d0fe 50%, #ede9fe 100%);
         }
 
         body {
@@ -2759,10 +2785,13 @@ body.dark-mode .profile-select-btn {
                         <option value="theme-ocean">🌊 Deep Ocean</option>
                         <option value="theme-fire">🔥 Fire & Ice</option>
                         <option value="theme-rainbow">🌈 Rainbow Pride</option>
+                        <option value="theme-clouds">☁️ Cloud 9</option>
+                        <option value="theme-forest">🌲 Forest Hike</option>
                         <option value="theme-dark">🌑 Dark Mode Pro</option>
                         <option value="theme-sunshine">☀️ Sunshine Yellow</option>
                         <option value="theme-mint">🌿 Mint Fresh</option>
                         <option value="theme-grape">🍇 Grape Soda</option>
+                        <option value="theme-custom">🧪 Custom (Builder)</option>
                     </select>
                 </div>
                 
@@ -3101,6 +3130,22 @@ let commissionBrackets = []; // Store commission bracket configuration
             darkMode: false,
         };
 
+        const DEFAULT_CUSTOM_THEME = {
+            primary: '#8B5CF6',
+            secondary: '#EC4899',
+            success: '#10B981',
+            danger: '#EF4444',
+            warning: '#F59E0B',
+            info: '#3B82F6',
+            font: "'Poppins', sans-serif",
+            radius: '20px',
+            animation: '0.3s'
+        };
+
+        const CUSTOM_THEME_INPUT_IDS = ['customPrimary', 'customSecondary', 'customSuccess', 'customDanger', 'customWarning', 'customInfo', 'customFont', 'customRadius', 'customAnimation'];
+
+        let savedCustomTheme = { ...DEFAULT_CUSTOM_THEME };
+
         let calcValue = '0';
         
         // Streaming service categories for profile tracking
@@ -3429,6 +3474,7 @@ function selectProfile(number) {
             seedDefaultProducts(); // Seed default products if needed
             loadAllData();
             applySettings();
+            updateThemePreview(savedCustomTheme);
             // ✅ FIXED: Setup event listeners AFTER DOM is ready
             setTimeout(setupEventListeners, 100);
         }
@@ -3572,7 +3618,22 @@ function loadAllData() {
             applySettings();
         }
     });
-    
+
+    getRef('settings/' + currentUsername + '/customTheme').on('value', (snapshot) => {
+        if (snapshot.exists()) {
+            savedCustomTheme = { ...DEFAULT_CUSTOM_THEME, ...snapshot.val() };
+        } else {
+            savedCustomTheme = { ...DEFAULT_CUSTOM_THEME };
+        }
+
+        if (settings.theme === 'theme-custom') {
+            applyCustomThemeStyles(savedCustomTheme);
+        }
+
+        populateCustomThemeInputs(savedCustomTheme);
+        updateThemePreview(savedCustomTheme);
+    });
+
     // Populate Sold By dropdown with real admin names
     populateSoldByDropdown();
 }
@@ -3643,15 +3704,16 @@ function loadAllSalesData() {
         getRef('sales/' + userKey).on('value', (snapshot) => {
             const salesData = snapshot.val() || {};
             sales = [];
-            
+
             console.log('📊 Admin sales data:', salesData);
-            
+
             Object.keys(salesData).forEach(saleKey => {
                 const sale = salesData[saleKey];
                 sale.id = saleKey;
                 sale.userName = currentSession.customName;
                 sale.userId = currentSession.id;
                 sale.userRole = currentSession.role;
+                sale.userKey = userKey;
                 sales.push(sale);
             });
             
@@ -3683,9 +3745,9 @@ function populateSoldByDropdown() {
 
 function saveSettings() {
     settings.theme = document.getElementById('themeSelect').value;
-    
+
     showSyncingIndicator();
-    getRef('settings/' + currentUsername).set(settings)
+    getRef('settings/' + currentUsername).update(settings)
         .then(() => {
             showToast('✅ Settings saved!', 'success');
             closeSettingsModal();
@@ -3696,12 +3758,20 @@ function saveSettings() {
 }
 
 function applySettings() {
-    document.body.className = settings.theme;
+    const themeClass = settings.theme || 'theme-purple';
+    document.body.className = themeClass;
     if (settings.darkMode) {
         document.body.classList.add('dark-mode');
     }
-    
-    document.getElementById('themeSelect').value = settings.theme;
+
+    const themeSelect = document.getElementById('themeSelect');
+    if (themeSelect) themeSelect.value = themeClass;
+
+    if (themeClass === 'theme-custom') {
+        applyCustomThemeStyles(savedCustomTheme || DEFAULT_CUSTOM_THEME);
+    } else {
+        clearCustomThemeStyles();
+    }
 }
 
         // =================== PRODUCT MANAGEMENT ===================
@@ -4231,23 +4301,31 @@ function deleteSale(saleId, saleUserId = null) {
     let saleRef;
     let userKey;
 
-    if (currentSession.role === 'owner' && saleUserId && saleUserId !== currentSession.id) {
-        // Owner deleting admin sale - find admin's username
-        const adminUser = users.find(u => u.id === saleUserId);
+    const normalizedSaleUserId = (!saleUserId || saleUserId === 'undefined' || saleUserId === 'null')
+        ? null
+        : saleUserId;
+
+    const currentUserKey = currentSession.username.replace(/[.#$/[\]]/g, '_');
+    userKey = currentUserKey;
+
+    // Try to locate the sale from the in-memory list so we know which Firebase user bucket holds it
+    const localSale = sales.find(s => String(s.id) === String(saleId));
+    if (localSale && localSale.userKey) {
+        userKey = localSale.userKey;
+        console.log('🗂️ Located sale via cached data. userKey =', userKey);
+    } else if (currentSession.role === 'owner' && normalizedSaleUserId && normalizedSaleUserId !== currentSession.id) {
+        // Owner deleting an admin sale but the cached record didn't have a userKey
+        const adminUser = users.find(u => u.id === normalizedSaleUserId);
         if (adminUser) {
             userKey = adminUser.username.replace(/[.#$/[\]]/g, '_');
-            saleRef = getRef(`sales/${userKey}/${saleId}`);
-            console.log('👑 Owner deleting admin sale, path:', `sales/${userKey}/${saleId}`);
+            console.log('👑 Owner resolved userKey from admin list:', userKey);
         } else {
-            showToast('❌ Could not find admin user', 'error');
-            return;
+            console.warn('⚠️ Owner could not resolve admin from passed saleUserId. Falling back to current user.');
         }
-    } else {
-        // Regular deletion (own sales)
-        userKey = currentSession.username.replace(/[.#$/[\]]/g, '_');
-        saleRef = getRef(`sales/${userKey}/${saleId}`);
-        console.log('👤 Deleting own sale, path:', `sales/${userKey}/${saleId}`);
     }
+
+    saleRef = getRef(`sales/${userKey}/${saleId}`);
+    console.log('🗑️ Deleting sale from path:', `sales/${userKey}/${saleId}`);
     
     // First, check if sale exists and get its data
     saleRef.once('value').then((snapshot) => {
@@ -4812,28 +4890,6 @@ getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
                 });
         }
 
-function deleteSale(id) {
-    if (!confirm('Delete this sale?')) return;
-    
-    const sale = sales.find(s => s.id === id);
-    if (!sale) return;
-    
-    // FIX: Use the same method as when adding sales
-    const userKey = (sale.soldBy || currentSession.username).replace(/[.#$[\]]/g, '_');
-    
-    console.log('Deleting sale from path:', 'sales/' + userKey + '/' + id);
-    
-    getRef('sales/' + userKey + '/' + id).remove()
-        .then(() => {
-            showToast('🗑️ Sale deleted', 'info');
-            autoCalculatePayouts();
-        })
-        .catch((error) => {
-            console.error('Delete error:', error);
-            showToast('❌ Error: ' + error.message, 'error');
-        });
-}
-
 function editSale(id) {
     const sale = sales.find(s => s.id === id);
     if (!sale) return;
@@ -5111,42 +5167,49 @@ function calculateStats() {
             }
             
             tbody.innerHTML = filtered.map(sale => {
-                const warrantyClass = sale.warranty === 'FW' ? 'fw' : 'nw';
-                const accountClass = sale.accountType === 'Solo' ? 'solo' : 'shared';
+                const warranty = (sale.warranty || '').toUpperCase();
+                const warrantyClass = warranty === 'FW' ? 'fw' : 'nw';
+                const accountType = sale.accountType === 'Solo' ? 'Solo' : (sale.accountType || 'Shared');
+                const accountClass = accountType === 'Solo' ? 'solo' : 'shared';
                 const soldIcon = sale.sold ? '✅' : '📦';
-                
+
                 // Format profile tracking columns
                 const accountId = sale.accountId || '-';
                 const profileNumber = sale.profileNumber ? `Profile ${sale.profileNumber}` : '-';
                 const slotNumber = sale.slotNumber ? `${sale.slotNumber}/${sale.profileType === 'Solo' ? '1' : '2'}` : '-';
                 const profileName = sale.profileName || '-';
                 const soldBy = sale.soldBy || sale.userName || '-';
-                
-// In renderSalesTable() function, update the table row:
-return `
-    <tr data-sale-id="${sale.id}">
-        <td>${sale.date}</td>
-        ${currentSession.role === 'owner' ? `<td>${sale.userName}</td>` : ''}
-        <td>${sale.productName}</td>
-        <td>${sale.buyerUsername || '-'}</td>
-        <td>${sale.accountEmail || '-'}</td>
-        <td>${accountId}</td>
-        <td>${profileNumber}</td>
-        <td>${slotNumber}</td>
-        <td>${profileName}</td>
-        <td>${soldBy}</td>
-        <td><span class="warranty-badge ${warrantyClass}">${sale.warranty}</span></td>
-        <td><span class="account-type-badge ${accountClass}">${sale.accountType}</span></td>
-        <td>${sale.quantity}</td>
-        <td class="amount-cell">₱${sale.price.toFixed(2)}</td>
-        <td class="amount-cell">₱${sale.totalPrice.toFixed(2)}</td>
-        <td><span class="sold-check">✅</span></td>
-        <td>
-            <button class="action-btn edit-btn" onclick="editSale(${sale.id})">✏️</button>
-            <button class="action-btn delete-btn" onclick="deleteSale('${sale.id}', '${sale.userId}')">🗑️</button>
-        </td>
-    </tr>
-`;
+
+                // Older sales might have prices stored as strings. Normalize before formatting.
+                const quantity = parseInt(sale.quantity, 10) || 1;
+                const price = Number(sale.price) || 0;
+                const totalPrice = Number(sale.totalPrice);
+                const computedTotal = Number.isFinite(totalPrice) ? totalPrice : price * quantity;
+
+                return `
+                    <tr data-sale-id="${sale.id}">
+                        <td>${sale.date || '-'}</td>
+                        ${currentSession.role === 'owner' ? `<td>${sale.userName || '-'}</td>` : ''}
+                        <td>${sale.productName || '-'}</td>
+                        <td>${sale.buyerUsername || '-'}</td>
+                        <td>${sale.accountEmail || '-'}</td>
+                        <td>${accountId}</td>
+                        <td>${profileNumber}</td>
+                        <td>${slotNumber}</td>
+                        <td>${profileName}</td>
+                        <td>${soldBy}</td>
+                        <td><span class="warranty-badge ${warrantyClass}">${warranty || '-'}</span></td>
+                        <td><span class="account-type-badge ${accountClass}">${accountType}</span></td>
+                        <td>${quantity}</td>
+                        <td class="amount-cell">₱${price.toFixed(2)}</td>
+                        <td class="amount-cell">₱${computedTotal.toFixed(2)}</td>
+                        <td><span class="sold-check">${soldIcon}</span></td>
+                        <td>
+                            <button class="action-btn edit-btn" onclick="editSale(${sale.id})">✏️</button>
+                            <button class="action-btn delete-btn" onclick="deleteSale('${sale.id}', '${sale.userId}')">🗑️</button>
+                        </td>
+                    </tr>
+                `;
             }).join('');
         }
 
@@ -5581,12 +5644,16 @@ return `
             const btnTheme = document.getElementById('btnTheme');
             if (btnTheme) {
                 btnTheme.addEventListener('click', () => {
-                    const themes = ['theme-purple', 'theme-blue', 'theme-green', 'theme-pink', 'theme-orange'];
+                    const themeSelect = document.getElementById('themeSelect');
+                    const themes = themeSelect
+                        ? Array.from(themeSelect.options).map(option => option.value)
+                        : ['theme-purple', 'theme-blue', 'theme-green', 'theme-pink', 'theme-orange'];
                     const currentIndex = themes.indexOf(settings.theme);
                     settings.theme = themes[(currentIndex + 1) % themes.length];
+                    if (themeSelect) themeSelect.value = settings.theme;
                     applySettings();
                     showSyncingIndicator();
-                    getRef('settings/' + currentUsername).set(settings);
+                    getRef('settings/' + currentUsername).update(settings);
                     showToast('🎨 Theme changed!', 'success');
                 });
             }
@@ -5604,7 +5671,7 @@ return `
                     settings.darkMode = !settings.darkMode;
                     applySettings();
                     showSyncingIndicator();
-                    getRef('settings/' + currentUsername).set(settings);
+                    getRef('settings/' + currentUsername).update(settings);
                     showToast(settings.darkMode ? '🌙 Dark mode enabled' : '☀️ Light mode enabled', 'info');
                 });
             }
@@ -5615,9 +5682,24 @@ return `
                     settings.darkMode = !settings.darkMode;
                     applySettings();
                     showSyncingIndicator();
-                    getRef('settings/' + currentUsername).set(settings);
+                    getRef('settings/' + currentUsername).update(settings);
                 });
             }
+
+            const themeSelect = document.getElementById('themeSelect');
+            if (themeSelect) {
+                themeSelect.addEventListener('change', (event) => {
+                    settings.theme = event.target.value;
+                    applySettings();
+                });
+            }
+
+            CUSTOM_THEME_INPUT_IDS.forEach(id => {
+                const input = document.getElementById(id);
+                if (!input) return;
+                const eventType = input.tagName === 'SELECT' ? 'change' : 'input';
+                input.addEventListener(eventType, handleCustomThemeInputChange);
+            });
             
             const btnLogout = document.getElementById('btnLogout');
             if (btnLogout) {
@@ -6171,10 +6253,6 @@ function closeAccountManagementModal() {
     document.getElementById('createAccountForm').reset();
 }
 
-function closeThemeBuilder() {
-    document.getElementById('themeBuilderModal').classList.remove('show');
-}
-
 function closeCommissionBracketModal() {
     document.getElementById('commissionBracketModal').classList.remove('show');
     document.getElementById('addBracketForm').reset();
@@ -6203,7 +6281,96 @@ document.addEventListener('keydown', function(e) {
 });
 
         // =================== THEME BUILDER FUNCTIONS ===================
+        const CUSTOMIZABLE_SELECTORS = '.card, .btn, input, select, textarea, .modal-content, .setting-card, .stat-card, .top-nav, .modal, .user-card, .payout-card';
+
+        function getCustomThemeFromInputs() {
+            return {
+                primary: document.getElementById('customPrimary')?.value || DEFAULT_CUSTOM_THEME.primary,
+                secondary: document.getElementById('customSecondary')?.value || DEFAULT_CUSTOM_THEME.secondary,
+                success: document.getElementById('customSuccess')?.value || DEFAULT_CUSTOM_THEME.success,
+                danger: document.getElementById('customDanger')?.value || DEFAULT_CUSTOM_THEME.danger,
+                warning: document.getElementById('customWarning')?.value || DEFAULT_CUSTOM_THEME.warning,
+                info: document.getElementById('customInfo')?.value || DEFAULT_CUSTOM_THEME.info,
+                font: document.getElementById('customFont')?.value || DEFAULT_CUSTOM_THEME.font,
+                radius: document.getElementById('customRadius')?.value || DEFAULT_CUSTOM_THEME.radius,
+                animation: document.getElementById('customAnimation')?.value || DEFAULT_CUSTOM_THEME.animation
+            };
+        }
+
+        function populateCustomThemeInputs(theme = DEFAULT_CUSTOM_THEME) {
+            if (!theme) return;
+            const primaryInput = document.getElementById('customPrimary');
+            if (primaryInput) primaryInput.value = theme.primary;
+            const secondaryInput = document.getElementById('customSecondary');
+            if (secondaryInput) secondaryInput.value = theme.secondary;
+            const successInput = document.getElementById('customSuccess');
+            if (successInput) successInput.value = theme.success;
+            const dangerInput = document.getElementById('customDanger');
+            if (dangerInput) dangerInput.value = theme.danger;
+            const warningInput = document.getElementById('customWarning');
+            if (warningInput) warningInput.value = theme.warning;
+            const infoInput = document.getElementById('customInfo');
+            if (infoInput) infoInput.value = theme.info;
+            const fontSelect = document.getElementById('customFont');
+            if (fontSelect) fontSelect.value = theme.font;
+            const radiusSelect = document.getElementById('customRadius');
+            if (radiusSelect) radiusSelect.value = theme.radius;
+            const animationSelect = document.getElementById('customAnimation');
+            if (animationSelect) animationSelect.value = theme.animation;
+        }
+
+        function updateThemePreview(theme = savedCustomTheme) {
+            if (!theme) return;
+            const preview = document.getElementById('themePreview');
+            if (!preview) return;
+
+            preview.style.borderColor = theme.primary;
+            preview.style.background = `linear-gradient(135deg, ${theme.secondary} 0%, ${theme.primary}22 100%)`;
+            preview.style.fontFamily = theme.font;
+
+            const previewButtons = preview.querySelectorAll('button');
+            if (previewButtons[0]) previewButtons[0].style.background = theme.primary;
+            if (previewButtons[1]) previewButtons[1].style.background = theme.success;
+            if (previewButtons[2]) previewButtons[2].style.background = theme.danger;
+        }
+
+        function applyBorderRadiusToElements(radius) {
+            document.querySelectorAll(CUSTOMIZABLE_SELECTORS).forEach(el => {
+                el.style.borderRadius = radius;
+            });
+        }
+
+        function clearCustomThemeStyles() {
+            const root = document.documentElement;
+            ['--primary', '--secondary', '--success', '--danger', '--warning', '--info', '--font-family', '--transition'].forEach(variable => {
+                root.style.removeProperty(variable);
+            });
+            applyBorderRadiusToElements('');
+        }
+
+        function applyCustomThemeStyles(theme) {
+            if (!theme) return;
+            const root = document.documentElement;
+            root.style.setProperty('--primary', theme.primary);
+            root.style.setProperty('--secondary', theme.secondary);
+            root.style.setProperty('--success', theme.success);
+            root.style.setProperty('--danger', theme.danger);
+            root.style.setProperty('--warning', theme.warning);
+            root.style.setProperty('--info', theme.info);
+            root.style.setProperty('--font-family', theme.font);
+            root.style.setProperty('--transition', `all ${theme.animation} cubic-bezier(0.4, 0, 0.2, 1)`);
+            applyBorderRadiusToElements(theme.radius);
+            updateThemePreview(theme);
+        }
+
+        function handleCustomThemeInputChange() {
+            savedCustomTheme = getCustomThemeFromInputs();
+            updateThemePreview(savedCustomTheme);
+        }
+
         function toggleThemeBuilder() {
+            populateCustomThemeInputs(savedCustomTheme || DEFAULT_CUSTOM_THEME);
+            updateThemePreview(savedCustomTheme || DEFAULT_CUSTOM_THEME);
             document.getElementById('themeBuilderModal').classList.add('show');
         }
 
@@ -6212,52 +6379,29 @@ document.addEventListener('keydown', function(e) {
         }
 
         function applyCustomTheme() {
-            const primary = document.getElementById('customPrimary').value;
-            const secondary = document.getElementById('customSecondary').value;
-            const success = document.getElementById('customSuccess').value;
-            const danger = document.getElementById('customDanger').value;
-            const warning = document.getElementById('customWarning').value;
-            const info = document.getElementById('customInfo').value;
-            const font = document.getElementById('customFont').value;
-            const radius = document.getElementById('customRadius').value;
-            const animation = document.getElementById('customAnimation').value;
-
-            // Apply custom CSS variables
-            document.documentElement.style.setProperty('--primary', primary);
-            document.documentElement.style.setProperty('--secondary', secondary);
-            document.documentElement.style.setProperty('--success', success);
-            document.documentElement.style.setProperty('--danger', danger);
-            document.documentElement.style.setProperty('--warning', warning);
-            document.documentElement.style.setProperty('--info', info);
-            document.documentElement.style.setProperty('--font-family', font);
-            
-            // Update border radius for all elements
-            document.querySelectorAll('.card, .btn, input, select, textarea, .modal-content').forEach(el => {
-                el.style.borderRadius = radius;
-            });
-
+            savedCustomTheme = getCustomThemeFromInputs();
+            settings.theme = 'theme-custom';
+            const themeSelect = document.getElementById('themeSelect');
+            if (themeSelect) themeSelect.value = 'theme-custom';
+            applySettings();
             showToast('✅ Custom theme applied!', 'success');
         }
 
         function saveCustomTheme() {
-            const customTheme = {
-                primary: document.getElementById('customPrimary').value,
-                secondary: document.getElementById('customSecondary').value,
-                success: document.getElementById('customSuccess').value,
-                danger: document.getElementById('customDanger').value,
-                warning: document.getElementById('customWarning').value,
-                info: document.getElementById('customInfo').value,
-                font: document.getElementById('customFont').value,
-                radius: document.getElementById('customRadius').value,
-                animation: document.getElementById('customAnimation').value
-            };
+            const customTheme = getCustomThemeFromInputs();
+            savedCustomTheme = customTheme;
 
-            // Save to Firebase
             showSyncingIndicator();
             getRef('settings/' + currentUsername + '/customTheme').set(customTheme)
                 .then(() => {
+                    settings.theme = 'theme-custom';
+                    const themeSelect = document.getElementById('themeSelect');
+                    if (themeSelect) themeSelect.value = 'theme-custom';
+                    applySettings();
+                    return getRef('settings/' + currentUsername).update({ theme: 'theme-custom' });
+                })
+                .then(() => {
                     showToast('✅ Custom theme saved!', 'success');
-                    applyCustomTheme();
                 })
                 .catch((error) => {
                     showToast('❌ Error: ' + error.message, 'error');
@@ -6265,21 +6409,9 @@ document.addEventListener('keydown', function(e) {
         }
 
         function exportTheme() {
-            const customTheme = {
-                primary: document.getElementById('customPrimary').value,
-                secondary: document.getElementById('customSecondary').value,
-                success: document.getElementById('customSuccess').value,
-                danger: document.getElementById('customDanger').value,
-                warning: document.getElementById('customWarning').value,
-                info: document.getElementById('customInfo').value,
-                font: document.getElementById('customFont').value,
-                radius: document.getElementById('customRadius').value,
-                animation: document.getElementById('customAnimation').value
-            };
-
+            const customTheme = getCustomThemeFromInputs();
             const themeCode = btoa(JSON.stringify(customTheme));
-            
-            // Copy to clipboard
+
             navigator.clipboard.writeText(themeCode).then(() => {
                 showToast('✅ Theme code copied to clipboard!', 'success');
             }).catch(() => {
@@ -6292,19 +6424,13 @@ document.addEventListener('keydown', function(e) {
             if (!themeCode) return;
 
             try {
-                const customTheme = JSON.parse(atob(themeCode));
-                
-                document.getElementById('customPrimary').value = customTheme.primary;
-                document.getElementById('customSecondary').value = customTheme.secondary;
-                document.getElementById('customSuccess').value = customTheme.success;
-                document.getElementById('customDanger').value = customTheme.danger;
-                document.getElementById('customWarning').value = customTheme.warning;
-                document.getElementById('customInfo').value = customTheme.info;
-                document.getElementById('customFont').value = customTheme.font;
-                document.getElementById('customRadius').value = customTheme.radius;
-                document.getElementById('customAnimation').value = customTheme.animation;
-
-                applyCustomTheme();
+                const customTheme = { ...DEFAULT_CUSTOM_THEME, ...JSON.parse(atob(themeCode)) };
+                savedCustomTheme = customTheme;
+                populateCustomThemeInputs(customTheme);
+                settings.theme = 'theme-custom';
+                const themeSelect = document.getElementById('themeSelect');
+                if (themeSelect) themeSelect.value = 'theme-custom';
+                applySettings();
                 showToast('✅ Theme imported successfully!', 'success');
             } catch (error) {
                 showToast('❌ Invalid theme code', 'error');
@@ -6312,18 +6438,16 @@ document.addEventListener('keydown', function(e) {
         }
 
         function resetTheme() {
-            document.getElementById('customPrimary').value = '#8B5CF6';
-            document.getElementById('customSecondary').value = '#EC4899';
-            document.getElementById('customSuccess').value = '#10B981';
-            document.getElementById('customDanger').value = '#EF4444';
-            document.getElementById('customWarning').value = '#F59E0B';
-            document.getElementById('customInfo').value = '#3B82F6';
-            document.getElementById('customFont').value = "'Poppins', sans-serif";
-            document.getElementById('customRadius').value = '20px';
-            document.getElementById('customAnimation').value = '0.3s';
-
-            applyCustomTheme();
+            savedCustomTheme = { ...DEFAULT_CUSTOM_THEME };
+            populateCustomThemeInputs(savedCustomTheme);
+            clearCustomThemeStyles();
+            settings.theme = 'theme-purple';
+            const themeSelect = document.getElementById('themeSelect');
+            if (themeSelect) themeSelect.value = 'theme-purple';
+            applySettings();
             showToast('✅ Theme reset to default!', 'success');
+
+            getRef('settings/' + currentUsername + '/customTheme').remove().catch(() => {});
         }
 
 // =================== BULK SALES FUNCTIONS ===================
