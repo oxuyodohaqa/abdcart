@@ -207,6 +207,148 @@ function buildProxyConfig(targetUrl) {
     }
 }
 
+const COUNTRY_PROXY_SUFFIX_OVERRIDES = {
+    IN: 'ine'
+};
+
+let proxyValidationErrorLogged = false;
+
+function getPreferredProxyUrl() {
+    if (CONFIG.network.forceDisableProxy) {
+        return null;
+    }
+
+    if (CONFIG.network.proxyUrl?.trim()) {
+        return CONFIG.network.proxyUrl.trim();
+    }
+
+    if (!CONFIG.network.allowEnvProxy) {
+        return null;
+    }
+
+    return process.env.SHEERID_PROXY || process.env.HTTPS_PROXY || process.env.HTTP_PROXY || null;
+}
+
+function getNoProxyList() {
+    const entries = [];
+    if (CONFIG.network.noProxy) {
+        entries.push(CONFIG.network.noProxy);
+    }
+    if (CONFIG.network.allowEnvProxy && process.env.NO_PROXY) {
+        entries.push(process.env.NO_PROXY);
+    }
+    return entries
+        .join(',')
+        .split(',')
+        .map(entry => entry.trim())
+        .filter(Boolean);
+}
+
+function splitHostAndPort(entry) {
+    if (entry.startsWith('[')) {
+        const closingIndex = entry.indexOf(']');
+        if (closingIndex !== -1) {
+            const host = entry.slice(1, closingIndex);
+            const remainder = entry.slice(closingIndex + 1);
+            if (remainder.startsWith(':')) {
+                return [host, remainder.slice(1)];
+            }
+            return [host, undefined];
+        }
+    }
+
+    const parts = entry.split(':');
+    if (parts.length === 2) {
+        return parts;
+    }
+
+    // If there are multiple colons (likely IPv6 without brackets), treat entire entry as host.
+    return [entry, undefined];
+}
+
+function shouldBypassProxy(hostname, port = '') {
+    const host = hostname?.toLowerCase();
+    const normalizedPort = port ? String(port) : '';
+    if (!host) return false;
+
+    const noProxyEntries = getNoProxyList();
+    if (noProxyEntries.length === 0) return false;
+
+    return noProxyEntries.some(entry => {
+        if (entry === '*') return true;
+
+        const [patternHost, patternPort] = splitHostAndPort(entry);
+        if (!patternHost) return false;
+
+        let normalizedPattern = patternHost.toLowerCase();
+        if (normalizedPattern.startsWith('*.')) {
+            normalizedPattern = normalizedPattern.slice(1);
+        }
+        const isWildcard = normalizedPattern.startsWith('.');
+
+        if (isWildcard) {
+            const suffix = normalizedPattern.slice(1);
+            return host === suffix || host.endsWith(normalizedPattern);
+        }
+
+        if (patternPort) {
+            return host === normalizedPattern && normalizedPort === patternPort;
+        }
+
+        return host === normalizedPattern;
+    });
+}
+
+function buildProxyConfig(targetUrl) {
+    const proxyUrl = getPreferredProxyUrl();
+
+    if (!proxyUrl) {
+        return CONFIG.network.forceDisableProxy ? false : null;
+    }
+
+    let targetHost = null;
+    let targetPort = '';
+    try {
+        const parsedTarget = new URL(targetUrl);
+        targetHost = parsedTarget.hostname;
+        targetPort = parsedTarget.port || (parsedTarget.protocol === 'https:' ? '443' : '80');
+    } catch (error) {
+        targetHost = null;
+    }
+
+    if (targetHost && shouldBypassProxy(targetHost, targetPort)) {
+        return false;
+    }
+
+    try {
+        const parsedProxy = new URL(proxyUrl);
+        if (!parsedProxy.hostname) {
+            return null;
+        }
+
+        const proxyConfig = {
+            protocol: parsedProxy.protocol?.replace(':', '') || 'http',
+            host: parsedProxy.hostname,
+            port: parsedProxy.port ? parseInt(parsedProxy.port, 10) : (parsedProxy.protocol === 'https:' ? 443 : 80)
+        };
+
+        if (parsedProxy.username || parsedProxy.password) {
+            proxyConfig.auth = {
+                username: decodeURIComponent(parsedProxy.username || ''),
+                password: decodeURIComponent(parsedProxy.password || '')
+            };
+        }
+
+        return proxyConfig;
+    } catch (error) {
+        if (!proxyValidationErrorLogged) {
+            console.log(chalk.yellow(`⚠️ Invalid proxy URL (${proxyUrl}): ${error.message}`));
+            proxyValidationErrorLogged = true;
+        }
+        return null;
+    }
+}
+
 // COUNTRY CONFIGURATIONS - ALL 24 COUNTRIES WITH SAME PROGRAM ID
 const COUNTRIES = {
     'US': {
@@ -643,6 +785,34 @@ async function promptProxyPreference(countryConfig) {
         CONFIG.network.proxyUrl = '';
         CONFIG.network.forceDisableProxy = true;
         CONFIG.network.relaxHttpsVerification = false;
+        console.log(chalk.yellow('🚫 Proxy disabled: Direct connection will be used.'));
+    }
+}
+
+function getBuiltInCountryProxyUrl(countryCode) {
+    if (!countryCode) return null;
+    const code = countryCode.toUpperCase();
+    const suffix = COUNTRY_PROXY_SUFFIX_OVERRIDES[code] || code.toLowerCase();
+    const username = `${BUILT_IN_PROXY_TEMPLATE.usernamePrefix}${suffix}`;
+    return `http://${username}:${BUILT_IN_PROXY_TEMPLATE.password}@${BUILT_IN_PROXY_TEMPLATE.host}:${BUILT_IN_PROXY_TEMPLATE.port}`;
+}
+
+async function promptProxyPreference(countryConfig) {
+    console.log(chalk.cyan('\n🌐 PROXY SELECTION'));
+    console.log(chalk.gray('   Built-in proxies are available for every supported country.'));
+    console.log(chalk.gray('   Choose whether to route traffic through the proxy or use a direct connection.'));
+
+    const answer = (await askQuestion(chalk.blue(`\nUse the built-in proxy for ${countryConfig.flag} ${countryConfig.name}? (y/N): `))).trim().toLowerCase();
+
+    if (answer === 'y' || answer === 'yes') {
+        const proxyUrl = getBuiltInCountryProxyUrl(countryConfig.code);
+        CONFIG.network.proxyUrl = proxyUrl;
+        CONFIG.network.forceDisableProxy = false;
+        CONFIG.network.allowEnvProxy = false;
+        console.log(chalk.green(`✅ Proxy enabled: ${proxyUrl}`));
+    } else {
+        CONFIG.network.proxyUrl = '';
+        CONFIG.network.forceDisableProxy = true;
         console.log(chalk.yellow('🚫 Proxy disabled: Direct connection will be used.'));
     }
 }
