@@ -2190,14 +2190,14 @@ body.dark-mode .profile-select-btn {
                         <input type="text" id="accountIdInput" placeholder="e.g. YTP-2401" required data-manual="false">
                         <button type="button" class="btn btn-secondary" onclick="regenerateAccountId()">🔄 Generate</button>
                     </div>
-                    <small style="display: block; margin-top: 5px; opacity: 0.7;">Each account needs a unique ID so profiles can be tracked per sale. Avoid using characters like . # $ [ ]</small>
+                    <small style="display: block; margin-top: 5px; opacity: 0.7;">Each account needs a unique ID so profiles can be tracked per sale.</small>
                 </div>
 
                 <div class="form-group">
                     <label>📦 Status</label>
                     <select id="accountStatusSelect" required>
-                        <option value="no" selected>In Stock</option>
-                        <option value="yes">Sold</option>
+                        <option value="yes" selected>Sold</option>
+                        <option value="no">In Stock</option>
                     </select>
                 </div>
 
@@ -3220,13 +3220,6 @@ let commissionBrackets = []; // Store commission bracket configuration
             return { ...product, category: derivedCategory };
         }
 
-        function ensureAccountCategory(account) {
-            if (!account) return account;
-            if (account.category) return account;
-            const derivedCategory = determineProductCategory(account.product);
-            return { ...account, category: derivedCategory };
-        }
-
 // =================== DEFAULT PRODUCTS CATALOG ===================
 const DEFAULT_PRODUCTS = [
     // Disney
@@ -4222,11 +4215,6 @@ function updateProductDropdown() {
             accountSelectElement.addEventListener('change', handleAccountSelectionChange);
         }
 
-        const profileTypeRadios = document.querySelectorAll('input[name="profileType"]');
-        profileTypeRadios.forEach(radio => {
-            radio.addEventListener('change', updateProfileStatus);
-        });
-
         // Handle product selection for profile tracking
         function handleProductChangeForProfileTracking(productId) {
             const product = products.find(p => p.id === productId);
@@ -4241,92 +4229,29 @@ function updateProductDropdown() {
             const isStreaming = STREAMING_CATEGORIES.includes(product.category);
 
             if (isStreaming) {
-                resetProfileTrackingFields();
                 lastProductNameForAccountFilter = product.name;
                 document.getElementById('profileTrackingFields').style.display = 'block';
                 populateAccountDropdown(product.name);
             } else {
-                resetProfileTrackingFields();
                 lastProductNameForAccountFilter = '';
                 document.getElementById('profileTrackingFields').style.display = 'none';
             }
         }
 
-        function resetProfileTrackingFields() {
-            const accountSelect = document.getElementById('accountIdSelect');
-            const profileSelect = document.getElementById('profileNumberSelect');
-            const profileNameInput = document.getElementById('profileNameInput');
-            const statusCard = document.getElementById('profileStatusDisplay');
-            const statusText = document.getElementById('profileStatusText');
-            const slotDetails = document.getElementById('profileSlotDetails');
-
-            if (accountSelect) accountSelect.value = '';
-            if (profileSelect) {
-                profileSelect.innerHTML = '<option value="">-- Select Profile --</option>';
-            }
-            if (profileNameInput) profileNameInput.value = '';
-
-            document.querySelectorAll('input[name="profileType"]').forEach(radio => {
-                radio.checked = false;
-            });
-
-            if (statusCard) statusCard.style.display = 'none';
-            if (statusText) statusText.textContent = '';
-            if (slotDetails) slotDetails.innerHTML = '';
-        }
-
-        function getAccountSlotsPerProfile(account, fallbackProfileType = '') {
-            if (account) {
-                if (account.slotsPerProfile) {
-                    return account.slotsPerProfile;
-                }
-                if (account.profileType) {
-                    return account.profileType.toLowerCase() === 'shared' ? 2 : 1;
-                }
-            }
-
-            if (fallbackProfileType) {
-                return fallbackProfileType.toLowerCase() === 'shared' ? 2 : 1;
-            }
-
-            return 1;
-        }
-
         // Populate account dropdown based on product name
-        function populateAccountDropdown(productName = null) {
+        function populateAccountDropdown(productName) {
             const accountSelect = document.getElementById('accountIdSelect');
             const profileSelect = document.getElementById('profileNumberSelect');
             const profileStatusDisplay = document.getElementById('profileStatusDisplay');
             if (!accountSelect) return;
 
-            const filterSource = productName !== null ? productName : lastProductNameForAccountFilter;
-            if (productName !== null) {
-                lastProductNameForAccountFilter = productName || '';
-            }
-            const previousSelection = accountSelect.value;
             accountSelect.innerHTML = '<option value="">-- Select Account --</option>';
 
-            if (profileSelect) {
-                profileSelect.innerHTML = '<option value="">-- Select Profile --</option>';
-            }
-            if (profileStatusDisplay) {
-                profileStatusDisplay.style.display = 'none';
-            }
-
-            const targetCategory = filterSource ? determineProductCategory(filterSource) : '';
-            const filteredAccounts = accounts
-                .filter(account => {
-                    if (!targetCategory) return true;
-                    const accountCategory = account.category || determineProductCategory(account.product);
-                    return accountCategory === targetCategory;
-                })
-                .sort((a, b) => {
-                    if (a.status === b.status) {
-                        return (a.id || '').localeCompare(b.id || '');
-                    }
-                    return a.status === 'no' ? -1 : 1; // Show in-stock accounts first
-                });
-
+            const normalizedProduct = productName ? productName.toLowerCase() : '';
+            const filteredAccounts = accounts.filter(acc => {
+                if (!normalizedProduct) return true;
+                return (acc.product || '').toLowerCase() === normalizedProduct;
+            });
             filteredAccounts.forEach(account => {
                 const statusLabel = account.status === 'yes' ? 'Sold' : 'In Stock';
                 accountSelect.innerHTML += `<option value="${account.id}">${account.id} - ${account.product} (${statusLabel})</option>`;
@@ -4380,16 +4305,14 @@ function updateProductDropdown() {
             const profileNumber = document.getElementById('profileNumberSelect').value;
             const profileTypeSelection = document.querySelector('input[name="profileType"]:checked')?.value;
             const selectedAccount = accounts.find(acc => acc.id === accountId);
-            const statusCard = document.getElementById('profileStatusDisplay');
-            const statusTextElement = document.getElementById('profileStatusText');
-            const slotDetailsElement = document.getElementById('profileSlotDetails');
 
-            if (!statusCard || !statusTextElement || !slotDetailsElement) return;
+            if (!accountId || !profileNumber) {
+                document.getElementById('profileStatusDisplay').style.display = 'none';
+                return;
+            }
 
-            if (!accountId || !profileNumber || !selectedAccount) {
-                statusCard.style.display = 'none';
-                statusTextElement.textContent = '';
-                slotDetailsElement.innerHTML = '';
+            if (!selectedAccount) {
+                document.getElementById('profileStatusDisplay').style.display = 'none';
                 return;
             }
 
@@ -5012,13 +4935,28 @@ function deleteSale(saleId, saleUserId = null) {
         }
 
         function openAccountManagementModal() {
-            resetAccountFormDefaults();
+            const form = document.getElementById('createAccountForm');
+            if (form) form.reset();
+
+            const accountIdInput = document.getElementById('accountIdInput');
+            if (accountIdInput) {
+                accountIdInput.dataset.manual = 'false';
+            }
+
+            fillAccountId(true);
             document.getElementById('accountManagementModal').classList.add('show');
         }
 
         function closeAccountManagementModal() {
             document.getElementById('accountManagementModal').classList.remove('show');
-            resetAccountFormDefaults();
+            const form = document.getElementById('createAccountForm');
+            if (form) form.reset();
+
+            const accountIdInput = document.getElementById('accountIdInput');
+            if (accountIdInput) {
+                accountIdInput.value = '';
+                accountIdInput.dataset.manual = 'false';
+            }
         }
 
         function generateAccountId(productName) {
@@ -5050,25 +4988,9 @@ function deleteSale(saleId, saleUserId = null) {
         function saveAccount(event) {
             event.preventDefault();
 
-            const form = document.getElementById('createAccountForm');
-            const submitButton = form?.querySelector('button[type="submit"]');
-            const originalButtonLabel = submitButton ? submitButton.textContent : '';
-            const resetAccountButtonState = () => {
-                if (submitButton) {
-                    submitButton.disabled = false;
-                    submitButton.textContent = originalButtonLabel || '✅ Create Account';
-                }
-            };
-
-            if (submitButton) {
-                submitButton.disabled = true;
-                submitButton.textContent = '⏳ Saving...';
-            }
-
             const accountId = document.getElementById('accountIdInput').value.trim();
             const product = document.getElementById('accountProductSelect').value;
-            const profilesInput = document.getElementById('accountProfilesInput');
-            const totalProfiles = parseInt(profilesInput.value, 10);
+            const totalProfiles = parseInt(document.getElementById('accountProfilesInput').value, 10);
             const profileTypeElement = document.querySelector('input[name="accountProfileType"]:checked');
             const profileType = profileTypeElement ? profileTypeElement.value : '';
             const status = document.getElementById('accountStatusSelect').value;
@@ -5076,38 +4998,21 @@ function deleteSale(saleId, saleUserId = null) {
 
             if (!accountId) {
                 showToast('⚠️ Please enter an account ID', 'error');
-                resetAccountButtonState();
-                return;
-            }
-
-            if (containsInvalidFirebaseKeyChars(accountId)) {
-                showToast('⚠️ Account ID cannot include . # $ [ ] characters', 'error');
-                resetAccountButtonState();
                 return;
             }
 
             if (!product) {
                 showToast('⚠️ Please select a product for the account', 'error');
-                resetAccountButtonState();
                 return;
             }
 
             if (!profileType) {
                 showToast('⚠️ Please select a profile type', 'error');
-                resetAccountButtonState();
                 return;
             }
 
-            const maxProfiles = parseInt(profilesInput.max || '10', 10);
-            if (!Number.isInteger(totalProfiles) || totalProfiles <= 0) {
+            if (isNaN(totalProfiles) || totalProfiles <= 0) {
                 showToast('⚠️ Please provide how many profiles this account contains', 'error');
-                resetAccountButtonState();
-                return;
-            }
-
-            if (totalProfiles > maxProfiles) {
-                showToast(`⚠️ Maximum allowed profiles per account is ${maxProfiles}`, 'error');
-                resetAccountButtonState();
                 return;
             }
 
@@ -5126,7 +5031,6 @@ function deleteSale(saleId, saleUserId = null) {
                 profileType: profileType,
                 slotsPerProfile: slotsPerProfile,
                 status: status,
-                category: determineProductCategory(product),
                 createdDate: new Date().toISOString().split('T')[0],
                 createdBy: currentSession.username
             };
@@ -5164,7 +5068,7 @@ function deleteSale(saleId, saleUserId = null) {
                 const statusText = isSold ? '✅ Sold' : '📦 In Stock';
                 const statusColor = isSold ? 'var(--danger)' : 'var(--success)';
                 const profileTypeLabel = account.profileType === 'shared' ? 'Shared' : 'Solo';
-                const slotsPerProfile = getAccountSlotsPerProfile(account, account.profileType || profileTypeLabel);
+                const slotsPerProfile = account.slotsPerProfile || (profileTypeLabel === 'Solo' ? 1 : 2);
 
                 // Build profile status
                 let profilesHTML = '';
