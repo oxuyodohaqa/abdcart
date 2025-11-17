@@ -1423,6 +1423,18 @@ body.dark-mode .profile-select-btn {
             color: var(--primary);
         }
 
+        .inventory-status-badge {
+            display: inline-flex;
+            align-items: center;
+            font-size: 0.85em;
+            font-weight: 800;
+            padding: 6px 14px;
+            border-radius: 999px;
+            border: 2px solid transparent;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
         .product-item-details {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -2156,15 +2168,21 @@ body.dark-mode .profile-select-btn {
                 <h2>🎬 Create Account</h2>
                 <button class="close-btn" onclick="closeAccountManagementModal()">✕</button>
             </div>
-            
-<div class="form-group">
-    <label>📦 Status</label>
-    <select id="productSoldStatus" required>
-        <option value="yes" selected>Sold</option> <!-- Default to "Sold" -->
-    </select>
-</div>
 
-                
+            <form id="createAccountForm" class="form-single-column" onsubmit="saveAccount(event)">
+                <div class="form-group">
+                    <label>🎬 Account ID</label>
+                    <input type="text" id="accountIdInput" placeholder="e.g., NETF-1234" required>
+                </div>
+
+                <div class="form-group">
+                    <label>📦 Status</label>
+                    <select id="accountStatus" required>
+                        <option value="stock" selected>Stock</option>
+                        <option value="sold">Sold</option>
+                    </select>
+                </div>
+
                 <div class="form-group">
                     <label>📦 Product</label>
                     <select id="accountProductSelect" required>
@@ -4083,13 +4101,19 @@ function updateProductDropdown() {
             
             accountSelect.innerHTML = '<option value="">-- Select Account --</option>';
             
-            const filteredAccounts = accounts.filter(acc => acc.product && acc.product.includes(category));
-            filteredAccounts.forEach(account => {
-                accountSelect.innerHTML += `<option value="${account.id}">${account.id} - ${account.product}</option>`;
+            const filteredAccounts = accounts.filter(acc => {
+                const matchesProduct = acc.product && acc.product.includes(category);
+                const accountStatus = (acc.status || 'stock');
+                return matchesProduct && accountStatus !== 'sold';
             });
-            
+
+            filteredAccounts.forEach(account => {
+                const statusLabel = (account.status || 'stock').toUpperCase();
+                accountSelect.innerHTML += `<option value="${account.id}">${account.id} - ${account.product} (${statusLabel})</option>`;
+            });
+
             if (filteredAccounts.length === 0) {
-                accountSelect.innerHTML += '<option value="" disabled>No accounts available - Create one first</option>';
+                accountSelect.innerHTML += '<option value="" disabled>All accounts for this product are sold. Create a new one.</option>';
             }
         }
 
@@ -4667,22 +4691,29 @@ getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
         
         function saveAccount(event) {
             event.preventDefault();
-            
+
             const accountId = document.getElementById('accountIdInput').value.trim();
+            const status = document.getElementById('accountStatus').value || 'stock';
             const product = document.getElementById('accountProductSelect').value;
             const totalProfiles = parseInt(document.getElementById('accountProfilesInput').value);
             const profileType = document.querySelector('input[name="accountProfileType"]:checked').value;
             const slotsPerProfile = profileType === 'solo' ? 1 : 2;
-            
+
+            if (!accountId) {
+                showToast('⚠️ Please enter an account ID', 'error');
+                return;
+            }
+
             // Check if account ID already exists
             const existingAccount = accounts.find(a => a.id === accountId);
             if (existingAccount) {
                 showToast('❌ Account ID already exists!', 'error');
                 return;
             }
-            
+
             const newAccount = {
                 id: accountId,
+                status: status,
                 product: product,
                 totalProfiles: totalProfiles,
                 profileType: profileType,
@@ -4716,7 +4747,11 @@ getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
                 const accountSales = sales.filter(s => s.accountId === account.id);
                 const totalRevenue = accountSales.reduce((sum, s) => sum + s.totalPrice, 0);
                 const totalCommissions = accountSales.reduce((sum, s) => sum + (s.commission * s.quantity), 0);
-                
+                const accountStatus = (account.status || 'stock');
+                const statusLabel = accountStatus === 'sold' ? 'Sold' : 'Stock';
+                const statusColor = accountStatus === 'sold' ? 'var(--danger)' : 'var(--success)';
+                const statusBg = accountStatus === 'sold' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)';
+
                 // Build profile status
                 let profilesHTML = '';
                 for (let i = 1; i <= account.totalProfiles; i++) {
@@ -4767,7 +4802,8 @@ getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
                     <div class="product-item">
                         <div class="product-item-header">
                             <div class="product-item-name">🎬 ${account.id} - ${account.product}</div>
-                            <div>
+                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
+                                <span class="inventory-status-badge" style="color: ${statusColor}; border-color: ${statusColor}; background: ${statusBg};">${statusLabel}</span>
                                 ${currentSession.role === 'owner' ? `<button class="action-btn delete-btn" onclick="deleteAccount('${account.id}')">🗑️ Delete</button>` : ''}
                             </div>
                         </div>
