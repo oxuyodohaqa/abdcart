@@ -4219,6 +4219,7 @@ function updateProductDropdown() {
         function handleProductChangeForProfileTracking(productId) {
             const product = products.find(p => p.id === productId);
             if (!product) {
+                resetProfileTrackingFields();
                 document.getElementById('profileTrackingFields').style.display = 'none';
                 lastProductNameForAccountFilter = '';
                 return;
@@ -4340,8 +4341,8 @@ function updateProductDropdown() {
                 statusColor = 'var(--danger)';
             }
             
-            document.getElementById('profileStatusText').textContent = statusText;
-            document.getElementById('profileStatusText').style.color = statusColor;
+            statusTextElement.textContent = statusText;
+            statusTextElement.style.color = statusColor;
             
             // Show slot details
             let slotDetails = '<strong>Slot Details:</strong><br>';
@@ -4354,8 +4355,8 @@ function updateProductDropdown() {
                 }
             }
             
-            document.getElementById('profileSlotDetails').innerHTML = slotDetails;
-            document.getElementById('profileStatusDisplay').style.display = 'block';
+            slotDetailsElement.innerHTML = slotDetails;
+            statusCard.style.display = 'block';
         }
 
 // Handle product selection for subscription products
@@ -4729,12 +4730,12 @@ function deleteSale(saleId, saleUserId = null) {
                         break;
                     }
                 }
-                
+
                 const profileName = document.getElementById('profileNameInput').value.trim() || null;
-                
+
                 const quantity = 1; // Always 1 for profile sales
                 const price = parseFloat(document.getElementById('productPrice').textContent.replace('₱', ''));
-                
+
                 // Calculate commission based on sold by admin
                 const soldByUser = users.find(u => u.username === soldBy);
                 const actualProfit = product.sellPrice - product.buyPrice;
@@ -4748,50 +4749,70 @@ function deleteSale(saleId, saleUserId = null) {
                     userCommissionPercent = currentSession.role === 'owner' ? 100 : getCommissionRateForProfit(actualProfit);
                 }
                 const commissionAmount = (actualProfit * userCommissionPercent) / 100;
-                const ownerProfit = actualProfit - commissionAmount;
-                
-// In the add sale form submit handler, replace the sale creation part with:
-const newSale = {
-    id: Date.now(),
-    userId: currentSession.id,
-    userName: currentSession.customName,
-    productId: productId,
-    productName: product.name,
-    buyerUsername: document.getElementById('buyerUsernameInput').value,
-    accountEmail: document.getElementById('accountEmailInput').value,
-    warranty: warrantyType.value,
-    accountType: accountType.value,
-    quantity: quantity,
-    price: price,
-    buyPrice: product.buyPrice,
-    sellPrice: product.sellPrice,
-    commission: yourProfit,
-    totalPrice: price * quantity,
-    totalCommission: yourProfit * quantity,
-    sold: true, // Always mark as sold when adding
-    date: new Date().toISOString().split('T')[0],
-    timestamp: Date.now() // Add timestamp for sorting
-};
+                const sellerRecord = soldByUser || users.find(u => u.username === currentSession.username) || currentSession;
+                const sellerName = sellerRecord.customName || sellerRecord.username || currentSession.customName;
+                const sellerUsername = sellerRecord.username || currentSession.username;
+                const sellerRole = soldByUser ? soldByUser.role : currentSession.role;
+                const sellerCommission = sellerRole === 'admin' ? commissionAmount : actualProfit;
+                const saleId = Date.now();
+                const saleDate = new Date();
+                const saleProfileNumber = parseInt(profileNumber, 10);
+                const saleProfileType = profileType.value;
 
-const userKey = currentSession.username.replace(/[.#$/[\]]/g, '_');
-showSyncingIndicator();
-getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
-    .then(() => {
-        document.getElementById('addSaleForm').reset();
-        document.getElementById('buyerUsernameInput').value = '';
-        document.getElementById('accountEmailInput').value = '';
-        document.getElementById('productDetailsCard').style.display = 'none';
-        document.getElementById('totalEarningsCard').style.display = 'none';
-        showToast('✅ Sale added successfully!', 'success');
-        autoCalculatePayouts();
-        
-        // Force refresh of data
-        loadAllSalesData();
-    })
-    .catch((error) => {
-        showToast('❌ Error: ' + error.message, 'error');
-    });
-                
+                const streamingSale = {
+                    id: saleId,
+                    userId: sellerRecord.id || currentSession.id,
+                    userName: sellerName,
+                    recordedBy: currentSession.username,
+                    recordedByName: currentSession.customName,
+                    productId: productId,
+                    productName: product.name,
+                    buyerUsername: buyerUsername,
+                    accountEmail: accountEmail,
+                    warranty: 'NW',
+                    accountType: saleProfileType,
+                    accountId: accountId,
+                    profileNumber: saleProfileNumber,
+                    profileName: profileName,
+                    profileType: saleProfileType,
+                    slotNumber: slotNumber,
+                    soldBy: sellerName,
+                    soldByUsername: sellerUsername,
+                    quantity: quantity,
+                    price: price,
+                    buyPrice: product.buyPrice,
+                    sellPrice: product.sellPrice,
+                    commission: sellerCommission,
+                    totalPrice: price * quantity,
+                    totalCommission: sellerCommission * quantity,
+                    sold: true,
+                    date: saleDate.toISOString().split('T')[0],
+                    timestamp: saleId
+                };
+
+                const userKey = sellerUsername.replace(/[.#$\[\]]/g, '_');
+                showSyncingIndicator();
+                getRef('sales/' + userKey + '/' + streamingSale.id).set(streamingSale)
+                    .then(() => {
+                        document.getElementById('addSaleForm').reset();
+                        resetProfileTrackingFields();
+                        document.getElementById('profileTrackingFields').style.display = 'none';
+                        lastProductNameForAccountFilter = '';
+                        document.getElementById('productDetailsCard').style.display = 'none';
+                        document.getElementById('totalEarningsCard').style.display = 'none';
+                        showToast('✅ Profile sale added successfully!', 'success');
+                        autoCalculatePayouts();
+
+                        // Force refresh of data
+                        loadAllSalesData();
+                        if (currentSession.role === 'owner') {
+                            renderInventoryDashboard();
+                        }
+                    })
+                    .catch((error) => {
+                        showToast('❌ Error: ' + error.message, 'error');
+                    });
+
             } else {
                 // Regular sale (non-streaming)
                 const warrantyType = document.querySelector('input[name="warranty"]:checked');
@@ -4881,6 +4902,38 @@ getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
 
         // =================== ACCOUNT MANAGEMENT ===================
         
+        function containsInvalidFirebaseKeyChars(value) {
+            return /[.#$\[\]]/.test(value);
+        }
+
+        function resetAccountFormDefaults() {
+            const form = document.getElementById('createAccountForm');
+            if (form) form.reset();
+
+            const accountIdInput = document.getElementById('accountIdInput');
+            if (accountIdInput) {
+                accountIdInput.value = '';
+                accountIdInput.dataset.manual = 'false';
+            }
+
+            const statusSelect = document.getElementById('accountStatusSelect');
+            if (statusSelect) {
+                statusSelect.value = 'no';
+            }
+
+            const profilesInput = document.getElementById('accountProfilesInput');
+            if (profilesInput) {
+                profilesInput.value = profilesInput.defaultValue || 5;
+            }
+
+            const soloRadio = document.getElementById('accountTypeSolo');
+            const sharedRadio = document.getElementById('accountTypeShared');
+            if (soloRadio) soloRadio.checked = false;
+            if (sharedRadio) sharedRadio.checked = true;
+
+            fillAccountId(true);
+        }
+
         function openAccountManagementModal() {
             const form = document.getElementById('createAccountForm');
             if (form) form.reset();
@@ -4967,6 +5020,7 @@ getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
             const existingAccount = accounts.find(a => (a.id || '').toLowerCase() === accountId.toLowerCase());
             if (existingAccount) {
                 showToast('❌ Account ID already exists!', 'error');
+                resetAccountButtonState();
                 return;
             }
 
@@ -4986,10 +5040,14 @@ getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
                 .then(() => {
                     closeAccountManagementModal();
                     showToast('✅ Account created successfully!', 'success');
+                    populateAccountDropdown(lastProductNameForAccountFilter);
                     renderInventoryDashboard();
                 })
                 .catch((error) => {
                     showToast('❌ Error: ' + error.message, 'error');
+                })
+                .finally(() => {
+                    resetAccountButtonState();
                 });
         }
         
@@ -5017,7 +5075,7 @@ getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
                 for (let i = 1; i <= account.totalProfiles; i++) {
                     const profileSales = accountSales.filter(s => s.profileNumber === i);
                     const filledSlots = profileSales.length;
-                    const maxSlots = account.slotsPerProfile;
+                    const maxSlots = slotsPerProfile;
                     
                     let statusIcon = '';
                     let statusColor = '';
