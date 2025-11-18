@@ -3030,6 +3030,55 @@ body.dark-mode .profile-select-btn {
         </div>
     </div>
 
+    <!-- Edit Subscription Product Modal -->
+    <div class="modal" id="editSubscriptionModal">
+        <div class="modal-content" style="max-width: 650px;">
+            <div class="modal-header">
+                <h2>✏️ Edit Subscription Product</h2>
+                <button class="close-btn" onclick="closeEditSubscriptionModal()">✕</button>
+            </div>
+
+            <form id="editSubscriptionForm" onsubmit="saveSubscriptionProductEdit(event)">
+                <input type="hidden" id="editSubProductId">
+
+                <div class="form-group">
+                    <label>📦 Product Name</label>
+                    <input type="text" id="editSubProductName" required>
+                </div>
+
+                <div class="form-group">
+                    <label>🛒 Buy Price (Your Cost)</label>
+                    <input type="number" id="editSubBuyPrice" step="0.01" min="0" required>
+                </div>
+
+                <div class="form-group">
+                    <label>💰 Full Account Sell Price</label>
+                    <input type="number" id="editSubFullPrice" step="0.01" min="0" required>
+                </div>
+
+                <div class="form-group">
+                    <label>👤 Solo Profile Price</label>
+                    <input type="number" id="editSubSoloPrice" step="0.01" min="0" required>
+                </div>
+
+                <div class="form-group">
+                    <label>👥 Shared Account Price</label>
+                    <input type="number" id="editSubSharedPrice" step="0.01" min="0" required>
+                </div>
+
+                <div class="form-group">
+                    <label>👥 Total Profiles / Slots</label>
+                    <input type="number" id="editSubTotalProfiles" min="1" max="20" required>
+                    <small style="display: block; margin-top: 6px; color: var(--text-color); opacity: 0.8;">
+                        ⚠️ Total profiles cannot be less than the number of already sold slots.
+                    </small>
+                </div>
+
+                <button type="submit" class="btn btn-success">💾 Save Subscription Changes</button>
+            </form>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div class="toast" id="toast">
         <span class="toast-icon" id="toastIcon">✓</span>
@@ -3112,6 +3161,17 @@ function showSyncingIndicator() {
         let payouts = [];
 let products = [];
 let subscriptionProducts = [];
+
+function getNumericValue(value) {
+    if (typeof value === 'number') return value;
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? null : parsed;
+}
+
+function formatCurrencyValue(value) {
+    const numeric = getNumericValue(value);
+    return numeric === null ? '—' : `₱${numeric.toFixed(2)}`;
+}
 let accounts = []; // Store streaming service accounts
 let selectedProfile = null;
 let realAdmins = []; // Store real admins from Firebase
@@ -3371,21 +3431,29 @@ function renderSubscriptionProducts() {
     }
     
     container.innerHTML = subscriptionProducts.map(product => {
-        const availableCount = product.profiles.filter(p => !p.sold).length;
-        
+        const profiles = Array.isArray(product.profiles) ? product.profiles : [];
+        const availableCount = profiles.filter(p => !p.sold).length;
+
+        const fullPrice = getNumericValue(product.fullPrice) ?? getNumericValue(product.sharedPrice);
+        const profilePrice = getNumericValue(product.profilePrice) ?? getNumericValue(product.soloPrice);
+        const sharedPrice = getNumericValue(product.sharedPrice);
+        const buyPrice = getNumericValue(product.buyPrice);
+
         return `
             <div class="subscription-product-item">
                 <div class="subscription-header">
                     <div class="subscription-title">🎬 ${product.name}</div>
                     <div>
+                        <button class="action-btn edit-btn" onclick="editSubscriptionProduct(${product.id})">✏️</button>
                         <button class="action-btn delete-btn" onclick="deleteSubscriptionProduct(${product.id})">🗑️</button>
                     </div>
                 </div>
                 
                 <div class="subscription-pricing">
-                    <div class="price-tag">💰 Full: ₱${product.fullPrice.toFixed(2)}</div>
-                    <div class="price-tag">👤 Profile: ₱${product.profilePrice.toFixed(2)}</div>
-                    <div class="price-tag">🛒 Cost: ₱${product.buyPrice.toFixed(2)}</div>
+                    <div class="price-tag">💰 Full: ${formatCurrencyValue(fullPrice)}</div>
+                    <div class="price-tag">👤 Solo Profile: ${formatCurrencyValue(profilePrice)}</div>
+                    <div class="price-tag">👥 Shared: ${formatCurrencyValue(sharedPrice)}</div>
+                    <div class="price-tag">🛒 Cost: ${formatCurrencyValue(buyPrice)}</div>
                 </div>
                 
                 <div class="availability-status">
@@ -3393,7 +3461,7 @@ function renderSubscriptionProducts() {
                 </div>
                 
                 <div class="profile-grid">
-                    ${product.profiles.map(profile => `
+                    ${profiles.map(profile => `
                         <div class="profile-slot ${profile.sold ? 'sold' : 'available'}">
                             <div class="profile-slot-icon">${profile.sold ? '✅' : '📦'}</div>
                             <div class="profile-slot-label">Profile ${profile.number}</div>
@@ -3411,6 +3479,134 @@ function deleteSubscriptionProduct(productId) {
     getRef('subscriptionProducts/' + productId).remove()
         .then(() => showToast('🗑️ Product deleted', 'info'))
         .catch((error) => showToast('❌ Error: ' + error.message, 'error'));
+}
+
+function editSubscriptionProduct(productId) {
+    if (currentSession.role !== 'owner') {
+        showToast('❌ Only owner can edit subscription products', 'error');
+        return;
+    }
+
+    const product = subscriptionProducts.find(p => p.id === productId);
+    if (!product) {
+        showToast('⚠️ Subscription product not found', 'error');
+        return;
+    }
+
+    document.getElementById('editSubProductId').value = product.id;
+    document.getElementById('editSubProductName').value = product.name;
+    document.getElementById('editSubBuyPrice').value = getNumericValue(product.buyPrice) ?? '';
+    document.getElementById('editSubFullPrice').value = getNumericValue(product.fullPrice) ?? '';
+    const soloValue = getNumericValue(product.profilePrice) ?? getNumericValue(product.soloPrice);
+    document.getElementById('editSubSoloPrice').value = soloValue ?? '';
+    document.getElementById('editSubSharedPrice').value = getNumericValue(product.sharedPrice) ?? '';
+    const existingProfiles = Array.isArray(product.profiles) ? product.profiles : [];
+    document.getElementById('editSubTotalProfiles').value = product.totalProfiles || existingProfiles.length || 1;
+
+    document.getElementById('editSubscriptionModal').classList.add('show');
+}
+
+function closeEditSubscriptionModal() {
+    document.getElementById('editSubscriptionModal').classList.remove('show');
+}
+
+function saveSubscriptionProductEdit(event) {
+    event.preventDefault();
+
+    if (currentSession.role !== 'owner') {
+        showToast('❌ Only owner can edit subscription products', 'error');
+        return;
+    }
+
+    const productId = parseInt(document.getElementById('editSubProductId').value, 10);
+    const product = subscriptionProducts.find(p => p.id === productId);
+    if (!product) {
+        showToast('⚠️ Subscription product not found', 'error');
+        return;
+    }
+
+    const name = document.getElementById('editSubProductName').value.trim();
+    const buyPrice = parseFloat(document.getElementById('editSubBuyPrice').value);
+    const fullPrice = parseFloat(document.getElementById('editSubFullPrice').value);
+    const soloPrice = parseFloat(document.getElementById('editSubSoloPrice').value);
+    const sharedPrice = parseFloat(document.getElementById('editSubSharedPrice').value);
+    const totalProfiles = parseInt(document.getElementById('editSubTotalProfiles').value, 10);
+
+    if (!name) {
+        showToast('⚠️ Product name is required', 'error');
+        return;
+    }
+
+    const hasInvalidPrice = [buyPrice, fullPrice, soloPrice, sharedPrice].some(value => isNaN(value) || value < 0);
+    if (hasInvalidPrice) {
+        showToast('⚠️ Please enter valid price values', 'error');
+        return;
+    }
+
+    if (isNaN(totalProfiles) || totalProfiles < 1) {
+        showToast('⚠️ Please provide a valid total profile count', 'error');
+        return;
+    }
+
+    const productProfiles = Array.isArray(product.profiles) ? product.profiles : [];
+    const soldProfiles = productProfiles.filter(p => p.sold);
+    if (totalProfiles < soldProfiles.length) {
+        showToast(`⚠️ ${soldProfiles.length} profiles are already sold. Increase the total or free some slots first.`, 'error');
+        return;
+    }
+
+    let updatedProfiles = [...productProfiles];
+    if (totalProfiles > updatedProfiles.length) {
+        const lastNumber = updatedProfiles.length;
+        for (let i = 1; i <= totalProfiles - updatedProfiles.length; i++) {
+            updatedProfiles.push({
+                number: lastNumber + i,
+                sold: false,
+                soldBy: '',
+                soldDate: ''
+            });
+        }
+    } else if (totalProfiles < updatedProfiles.length) {
+        let profilesToRemove = updatedProfiles.length - totalProfiles;
+        updatedProfiles = updatedProfiles
+            .sort((a, b) => b.number - a.number)
+            .filter(profile => {
+                if (!profile.sold && profilesToRemove > 0) {
+                    profilesToRemove--;
+                    return false;
+                }
+                return true;
+            })
+            .sort((a, b) => a.number - b.number);
+    }
+
+    updatedProfiles = updatedProfiles.map((profile, index) => ({
+        ...profile,
+        number: index + 1
+    }));
+
+    const updatedProduct = {
+        ...product,
+        name,
+        buyPrice,
+        fullPrice,
+        totalProfiles,
+        profilePrice: soloPrice,
+        soloPrice: soloPrice,
+        sharedPrice,
+        profiles: updatedProfiles,
+        updatedAt: new Date().toISOString()
+    };
+
+    showSyncingIndicator();
+    getRef('subscriptionProducts/' + productId).update(updatedProduct)
+        .then(() => {
+            closeEditSubscriptionModal();
+            showToast('✅ Subscription product updated!', 'success');
+        })
+        .catch((error) => {
+            showToast('❌ Error: ' + error.message, 'error');
+        });
 }
 
 function handleProductSelectionForSale() {
@@ -3899,8 +4095,9 @@ const sharedPrice = parseFloat(document.getElementById('subSharedPrice').value);
         buyPrice: buyPrice,
         fullPrice: fullPrice,
         totalProfiles: totalProfiles,
-soloPrice: soloPrice,
-sharedPrice: sharedPrice,
+        profilePrice: soloPrice,
+        soloPrice: soloPrice,
+        sharedPrice: sharedPrice,
         profiles: profiles,
         createdAt: new Date().toISOString().split('T')[0]
     };
