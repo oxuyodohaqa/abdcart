@@ -3112,6 +3112,17 @@ function showSyncingIndicator() {
         let payouts = [];
 let products = [];
 let subscriptionProducts = [];
+
+function getNumericValue(value) {
+    if (typeof value === 'number') return value;
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? null : parsed;
+}
+
+function formatCurrencyValue(value) {
+    const numeric = getNumericValue(value);
+    return numeric === null ? '—' : `₱${numeric.toFixed(2)}`;
+}
 let accounts = []; // Store streaming service accounts
 let selectedProfile = null;
 let realAdmins = []; // Store real admins from Firebase
@@ -3372,6 +3383,11 @@ function renderSubscriptionProducts() {
     
     container.innerHTML = subscriptionProducts.map(product => {
         const availableCount = product.profiles.filter(p => !p.sold).length;
+
+        const fullPrice = getNumericValue(product.fullPrice) ?? getNumericValue(product.sharedPrice);
+        const profilePrice = getNumericValue(product.profilePrice) ?? getNumericValue(product.soloPrice);
+        const sharedPrice = getNumericValue(product.sharedPrice);
+        const buyPrice = getNumericValue(product.buyPrice);
         
         return `
             <div class="subscription-product-item">
@@ -3383,9 +3399,10 @@ function renderSubscriptionProducts() {
                 </div>
                 
                 <div class="subscription-pricing">
-                    <div class="price-tag">💰 Full: ₱${product.fullPrice.toFixed(2)}</div>
-                    <div class="price-tag">👤 Profile: ₱${product.profilePrice.toFixed(2)}</div>
-                    <div class="price-tag">🛒 Cost: ₱${product.buyPrice.toFixed(2)}</div>
+                    <div class="price-tag">💰 Full: ${formatCurrencyValue(fullPrice)}</div>
+                    <div class="price-tag">👤 Solo Profile: ${formatCurrencyValue(profilePrice)}</div>
+                    <div class="price-tag">👥 Shared: ${formatCurrencyValue(sharedPrice)}</div>
+                    <div class="price-tag">🛒 Cost: ${formatCurrencyValue(buyPrice)}</div>
                 </div>
                 
                 <div class="availability-status">
@@ -3899,8 +3916,9 @@ const sharedPrice = parseFloat(document.getElementById('subSharedPrice').value);
         buyPrice: buyPrice,
         fullPrice: fullPrice,
         totalProfiles: totalProfiles,
-soloPrice: soloPrice,
-sharedPrice: sharedPrice,
+        profilePrice: soloPrice,
+        soloPrice: soloPrice,
+        sharedPrice: sharedPrice,
         profiles: profiles,
         createdAt: new Date().toISOString().split('T')[0]
     };
