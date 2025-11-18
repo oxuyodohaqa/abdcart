@@ -3116,6 +3116,12 @@ let accounts = []; // Store streaming service accounts
 let selectedProfile = null;
 let realAdmins = []; // Store real admins from Firebase
 let commissionBrackets = []; // Store commission bracket configuration
+
+function normalizeRole(role) {
+    if (!role) return 'admin';
+    const normalized = role.toString().trim().toLowerCase();
+    return normalized === 'owner' ? 'owner' : 'admin';
+}
     let settings = {
             theme: 'theme-purple',
             darkMode: false,
@@ -3461,6 +3467,7 @@ function selectProfile(number) {
             }
             
             currentSession = JSON.parse(session);
+            currentSession.role = normalizeRole(currentSession.role);
             currentUsername = currentSession.username;
             console.log('✅ Logged in as:', currentSession.customName);
             
@@ -3513,7 +3520,10 @@ function loadAllData() {
     // Load users
     getRef('users').on('value', (snapshot) => {
         const usersData = snapshot.val() || {};
-        users = Object.values(usersData);
+        users = Object.values(usersData).map(user => ({
+            ...user,
+            role: normalizeRole(user.role)
+        }));
         console.log('✅ Loaded users:', users.length);
         
         // Load real admins for product calculations
@@ -3992,9 +4002,9 @@ function updateProductDropdown() {
                         <div class="product-item-header">
                             <div class="product-item-name">${product.name}</div>
                             <div>
-                                ${currentSession.role === 'owner' || currentSession.role === 'admin' ? 
+                                ${currentSession.role === 'owner' ?
                                     `<button class="action-btn edit-btn" onclick="editProduct(${product.id})">✏️ Edit</button>` : ''}
-                                ${currentSession.role === 'owner' ? 
+                                ${currentSession.role === 'owner' ?
                                     `<button class="action-btn delete-btn" onclick="deleteProduct(${product.id})">🗑️ Delete</button>` : ''}
                             </div>
                         </div>
@@ -4402,7 +4412,7 @@ function deleteSale(saleId, saleUserId = null) {
 
         function saveProductEdit(event) {
             event.preventDefault();
-            
+
             const productId = parseInt(document.getElementById('editProductId').value);
             const name = document.getElementById('editProductName').value.trim();
             const buyPrice = parseFloat(document.getElementById('editProductBuyPrice').value);
@@ -4439,6 +4449,37 @@ function deleteSale(saleId, saleUserId = null) {
                     closeEditProductModal();
                     showToast('✅ Product updated successfully!', 'success');
                     renderProductList();
+                })
+                .catch((error) => {
+                    showToast('❌ Error: ' + error.message, 'error');
+                });
+        }
+
+        function deleteProduct(productId) {
+            if (currentSession.role !== 'owner') {
+                showToast('❌ Only owner can delete products', 'error');
+                return;
+            }
+
+            const normalizedId = (typeof productId === 'string' && !isNaN(productId)) ? parseInt(productId, 10) : productId;
+            const product = products.find(p => p.id === normalizedId || p.id === productId);
+            if (!product) {
+                showToast('⚠️ Product not found', 'error');
+                return;
+            }
+
+            if (!confirm(`🗑️ Delete product "${product.name}"? This action cannot be undone.`)) {
+                return;
+            }
+
+            showSyncingIndicator();
+            const firebaseId = product.id;
+            getRef('products/' + firebaseId).remove()
+                .then(() => {
+                    showToast('🗑️ Product deleted successfully!', 'success');
+                    products = products.filter(p => p.id !== firebaseId);
+                    renderProductList();
+                    updateProductDropdown();
                 })
                 .catch((error) => {
                     showToast('❌ Error: ' + error.message, 'error');
