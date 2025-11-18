@@ -2970,6 +2970,7 @@ body.dark-mode .profile-select-btn {
             
             <form id="editProductForm" onsubmit="saveProductEdit(event)">
                 <input type="hidden" id="editProductId">
+                <input type="hidden" id="editProductKey">
                 
                 <div class="form-group">
                     <label>📦 Product Name</label>
@@ -3116,6 +3117,39 @@ let accounts = []; // Store streaming service accounts
 let selectedProfile = null;
 let realAdmins = []; // Store real admins from Firebase
 let commissionBrackets = []; // Store commission bracket configuration
+
+function getStableNumericIdFromKey(key) {
+    if (!key) return Date.now();
+    const numericValue = Number(key);
+    if (!Number.isNaN(numericValue)) {
+        return numericValue;
+    }
+
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) {
+        hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+    }
+    return hash;
+}
+
+function getProductFirebaseKey(product) {
+    if (!product) return null;
+    return product.firebaseKey || product.id;
+}
+
+function findProductByIdentifier(identifier) {
+    if (identifier === undefined || identifier === null) return undefined;
+    return products.find(product => {
+        const firebaseKey = getProductFirebaseKey(product);
+        return firebaseKey == identifier || product.id == identifier;
+    });
+}
+
+function normalizeRole(role) {
+    if (!role) return 'admin';
+    const normalized = role.toString().trim().toLowerCase();
+    return normalized === 'owner' ? 'owner' : 'admin';
+}
     let settings = {
             theme: 'theme-purple',
             darkMode: false,
@@ -3461,6 +3495,7 @@ function selectProfile(number) {
             }
             
             currentSession = JSON.parse(session);
+            currentSession.role = normalizeRole(currentSession.role);
             currentUsername = currentSession.username;
             console.log('✅ Logged in as:', currentSession.customName);
             
@@ -3513,7 +3548,10 @@ function loadAllData() {
     // Load users
     getRef('users').on('value', (snapshot) => {
         const usersData = snapshot.val() || {};
-        users = Object.values(usersData);
+        users = Object.values(usersData).map(user => ({
+            ...user,
+            role: normalizeRole(user.role)
+        }));
         console.log('✅ Loaded users:', users.length);
         
         // Load real admins for product calculations
@@ -3540,7 +3578,18 @@ function loadAllData() {
     // Load products
     getRef('products').on('value', (snapshot) => {
         const productsData = snapshot.val() || {};
-        products = Object.values(productsData);
+        products = Object.entries(productsData).map(([key, product]) => {
+            const normalizedProduct = { ...product };
+            normalizedProduct.firebaseKey = key;
+
+            if (normalizedProduct.id === undefined || normalizedProduct.id === null || normalizedProduct.id === '') {
+                normalizedProduct.id = getStableNumericIdFromKey(key);
+            } else if (typeof normalizedProduct.id === 'string' && !Number.isNaN(Number(normalizedProduct.id))) {
+                normalizedProduct.id = Number(normalizedProduct.id);
+            }
+
+            return normalizedProduct;
+        });
         console.log('✅ Loaded products:', products.length);
         updateProductDropdown();
         // Both owners and admins can view products
@@ -3963,7 +4012,8 @@ function updateProductDropdown() {
             
             productList.innerHTML = products.map(product => {
                 const profit = product.sellPrice - product.buyPrice;
-                
+                const productIdentifier = String(getProductFirebaseKey(product));
+
                 // Calculate admin commission if user is admin
                 let adminCommission = 0;
                 let adminEarns = 0;
@@ -3992,10 +4042,10 @@ function updateProductDropdown() {
                         <div class="product-item-header">
                             <div class="product-item-name">${product.name}</div>
                             <div>
-                                ${currentSession.role === 'owner' || currentSession.role === 'admin' ? 
-                                    `<button class="action-btn edit-btn" onclick="editProduct(${product.id})">✏️ Edit</button>` : ''}
-                                ${currentSession.role === 'owner' ? 
-                                    `<button class="action-btn delete-btn" onclick="deleteProduct(${product.id})">🗑️ Delete</button>` : ''}
+                                ${currentSession.role === 'owner' ?
+                                    `<button class="action-btn edit-btn" onclick="editProduct('${productIdentifier}')">✏️ Edit</button>` : ''}
+                                ${currentSession.role === 'owner' ?
+                                    `<button class="action-btn delete-btn" onclick="deleteProduct('${productIdentifier}')">🗑️ Delete</button>` : ''}
                             </div>
                         </div>
                         <div class="product-item-details">
@@ -4358,18 +4408,19 @@ function deleteSale(saleId, saleUserId = null) {
     });
 }
         // Edit Product
-        function editProduct(productId) {
+        function editProduct(productIdentifier) {
             // Prevent admins from editing products
             if (currentSession.role !== 'owner') {
                 showToast('❌ Only owner can edit product prices and rates', 'error');
                 return;
             }
-            
-            const product = products.find(p => p.id === productId);
+
+            const product = findProductByIdentifier(productIdentifier);
             if (!product) return;
-            
+
             // Pre-fill the form
             document.getElementById('editProductId').value = product.id;
+            document.getElementById('editProductKey').value = getProductFirebaseKey(product);
             document.getElementById('editProductName').value = product.name;
             document.getElementById('editProductBuyPrice').value = product.buyPrice;
             document.getElementById('editProductSellPrice').value = product.sellPrice;
@@ -4398,12 +4449,15 @@ function deleteSale(saleId, saleUserId = null) {
 
         function closeEditProductModal() {
             document.getElementById('editProductModal').classList.remove('show');
+            document.getElementById('editProductKey').value = '';
         }
 
         function saveProductEdit(event) {
             event.preventDefault();
-            
-            const productId = parseInt(document.getElementById('editProductId').value);
+
+            const productIdField = document.getElementById('editProductId').value;
+            const firebaseKey = document.getElementById('editProductKey').value;
+            const parsedProductId = parseInt(productIdField, 10);
             const name = document.getElementById('editProductName').value.trim();
             const buyPrice = parseFloat(document.getElementById('editProductBuyPrice').value);
             const sellPrice = parseFloat(document.getElementById('editProductSellPrice').value);
@@ -4422,8 +4476,12 @@ function deleteSale(saleId, saleUserId = null) {
             
             const margin = ((sellPrice - buyPrice) / buyPrice * 100);
             
+            const productIdentifier = firebaseKey || productIdField;
+            const existingProduct = findProductByIdentifier(productIdentifier);
+            const stableProductId = existingProduct ? existingProduct.id : (Number.isNaN(parsedProductId) ? getStableNumericIdFromKey(productIdentifier) : parsedProductId);
+
             const updatedProduct = {
-                id: productId,
+                id: stableProductId,
                 name: name,
                 buyPrice: buyPrice,
                 sellPrice: sellPrice,
@@ -4432,13 +4490,44 @@ function deleteSale(saleId, saleUserId = null) {
                 accountTypes: accountTypes,
                 updatedDate: new Date().toISOString().split('T')[0]
             };
-            
+
             showSyncingIndicator();
-            getRef('products/' + productId).update(updatedProduct)
+            const productRefKey = firebaseKey || stableProductId;
+            getRef('products/' + productRefKey).update(updatedProduct)
                 .then(() => {
                     closeEditProductModal();
                     showToast('✅ Product updated successfully!', 'success');
                     renderProductList();
+                })
+                .catch((error) => {
+                    showToast('❌ Error: ' + error.message, 'error');
+                });
+        }
+
+        function deleteProduct(productIdentifier) {
+            if (currentSession.role !== 'owner') {
+                showToast('❌ Only owner can delete products', 'error');
+                return;
+            }
+
+            const product = findProductByIdentifier(productIdentifier);
+            if (!product) {
+                showToast('⚠️ Product not found', 'error');
+                return;
+            }
+
+            if (!confirm(`🗑️ Delete product "${product.name}"? This action cannot be undone.`)) {
+                return;
+            }
+
+            showSyncingIndicator();
+            const firebaseKey = getProductFirebaseKey(product);
+            getRef('products/' + firebaseKey).remove()
+                .then(() => {
+                    showToast('🗑️ Product deleted successfully!', 'success');
+                    products = products.filter(p => getProductFirebaseKey(p) !== firebaseKey);
+                    renderProductList();
+                    updateProductDropdown();
                 })
                 .catch((error) => {
                     showToast('❌ Error: ' + error.message, 'error');
