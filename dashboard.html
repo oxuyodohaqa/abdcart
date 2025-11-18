@@ -2970,6 +2970,7 @@ body.dark-mode .profile-select-btn {
             
             <form id="editProductForm" onsubmit="saveProductEdit(event)">
                 <input type="hidden" id="editProductId">
+                <input type="hidden" id="editProductKey">
                 
                 <div class="form-group">
                     <label>📦 Product Name</label>
@@ -3550,7 +3551,18 @@ function loadAllData() {
     // Load products
     getRef('products').on('value', (snapshot) => {
         const productsData = snapshot.val() || {};
-        products = Object.values(productsData);
+        products = Object.entries(productsData).map(([key, product]) => {
+            const normalizedProduct = { ...product };
+            normalizedProduct.firebaseKey = key;
+
+            if (normalizedProduct.id === undefined || normalizedProduct.id === null || normalizedProduct.id === '') {
+                normalizedProduct.id = getStableNumericIdFromKey(key);
+            } else if (typeof normalizedProduct.id === 'string' && !Number.isNaN(Number(normalizedProduct.id))) {
+                normalizedProduct.id = Number(normalizedProduct.id);
+            }
+
+            return normalizedProduct;
+        });
         console.log('✅ Loaded products:', products.length);
         updateProductDropdown();
         // Both owners and admins can view products
@@ -3973,7 +3985,8 @@ function updateProductDropdown() {
             
             productList.innerHTML = products.map(product => {
                 const profit = product.sellPrice - product.buyPrice;
-                
+                const productIdentifier = String(getProductFirebaseKey(product));
+
                 // Calculate admin commission if user is admin
                 let adminCommission = 0;
                 let adminEarns = 0;
@@ -4368,18 +4381,19 @@ function deleteSale(saleId, saleUserId = null) {
     });
 }
         // Edit Product
-        function editProduct(productId) {
+        function editProduct(productIdentifier) {
             // Prevent admins from editing products
             if (currentSession.role !== 'owner') {
                 showToast('❌ Only owner can edit product prices and rates', 'error');
                 return;
             }
-            
-            const product = products.find(p => p.id === productId);
+
+            const product = findProductByIdentifier(productIdentifier);
             if (!product) return;
-            
+
             // Pre-fill the form
             document.getElementById('editProductId').value = product.id;
+            document.getElementById('editProductKey').value = getProductFirebaseKey(product);
             document.getElementById('editProductName').value = product.name;
             document.getElementById('editProductBuyPrice').value = product.buyPrice;
             document.getElementById('editProductSellPrice').value = product.sellPrice;
@@ -4408,6 +4422,7 @@ function deleteSale(saleId, saleUserId = null) {
 
         function closeEditProductModal() {
             document.getElementById('editProductModal').classList.remove('show');
+            document.getElementById('editProductKey').value = '';
         }
 
         function saveProductEdit(event) {
@@ -4432,8 +4447,12 @@ function deleteSale(saleId, saleUserId = null) {
             
             const margin = ((sellPrice - buyPrice) / buyPrice * 100);
             
+            const productIdentifier = firebaseKey || productIdField;
+            const existingProduct = findProductByIdentifier(productIdentifier);
+            const stableProductId = existingProduct ? existingProduct.id : (Number.isNaN(parsedProductId) ? getStableNumericIdFromKey(productIdentifier) : parsedProductId);
+
             const updatedProduct = {
-                id: productId,
+                id: stableProductId,
                 name: name,
                 buyPrice: buyPrice,
                 sellPrice: sellPrice,
@@ -4442,9 +4461,10 @@ function deleteSale(saleId, saleUserId = null) {
                 accountTypes: accountTypes,
                 updatedDate: new Date().toISOString().split('T')[0]
             };
-            
+
             showSyncingIndicator();
-            getRef('products/' + productId).update(updatedProduct)
+            const productRefKey = firebaseKey || stableProductId;
+            getRef('products/' + productRefKey).update(updatedProduct)
                 .then(() => {
                     closeEditProductModal();
                     showToast('✅ Product updated successfully!', 'success');
