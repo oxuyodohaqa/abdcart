@@ -3118,33 +3118,6 @@ let selectedProfile = null;
 let realAdmins = []; // Store real admins from Firebase
 let commissionBrackets = []; // Store commission bracket configuration
 
-function getStableNumericIdFromKey(key) {
-    if (!key) return Date.now();
-    const numericValue = Number(key);
-    if (!Number.isNaN(numericValue)) {
-        return numericValue;
-    }
-
-    let hash = 0;
-    for (let i = 0; i < key.length; i++) {
-        hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
-    }
-    return hash;
-}
-
-function getProductFirebaseKey(product) {
-    if (!product) return null;
-    return product.firebaseKey || product.id;
-}
-
-function findProductByIdentifier(identifier) {
-    if (identifier === undefined || identifier === null) return undefined;
-    return products.find(product => {
-        const firebaseKey = getProductFirebaseKey(product);
-        return firebaseKey == identifier || product.id == identifier;
-    });
-}
-
 function normalizeRole(role) {
     if (!role) return 'admin';
     const normalized = role.toString().trim().toLowerCase();
@@ -4043,9 +4016,9 @@ function updateProductDropdown() {
                             <div class="product-item-name">${product.name}</div>
                             <div>
                                 ${currentSession.role === 'owner' ?
-                                    `<button class="action-btn edit-btn" onclick="editProduct('${productIdentifier}')">✏️ Edit</button>` : ''}
+                                    `<button class="action-btn edit-btn" onclick="editProduct(${product.id})">✏️ Edit</button>` : ''}
                                 ${currentSession.role === 'owner' ?
-                                    `<button class="action-btn delete-btn" onclick="deleteProduct('${productIdentifier}')">🗑️ Delete</button>` : ''}
+                                    `<button class="action-btn delete-btn" onclick="deleteProduct(${product.id})">🗑️ Delete</button>` : ''}
                             </div>
                         </div>
                         <div class="product-item-details">
@@ -4455,9 +4428,7 @@ function deleteSale(saleId, saleUserId = null) {
         function saveProductEdit(event) {
             event.preventDefault();
 
-            const productIdField = document.getElementById('editProductId').value;
-            const firebaseKey = document.getElementById('editProductKey').value;
-            const parsedProductId = parseInt(productIdField, 10);
+            const productId = parseInt(document.getElementById('editProductId').value);
             const name = document.getElementById('editProductName').value.trim();
             const buyPrice = parseFloat(document.getElementById('editProductBuyPrice').value);
             const sellPrice = parseFloat(document.getElementById('editProductSellPrice').value);
@@ -4504,13 +4475,14 @@ function deleteSale(saleId, saleUserId = null) {
                 });
         }
 
-        function deleteProduct(productIdentifier) {
+        function deleteProduct(productId) {
             if (currentSession.role !== 'owner') {
                 showToast('❌ Only owner can delete products', 'error');
                 return;
             }
 
-            const product = findProductByIdentifier(productIdentifier);
+            const normalizedId = (typeof productId === 'string' && !isNaN(productId)) ? parseInt(productId, 10) : productId;
+            const product = products.find(p => p.id === normalizedId || p.id === productId);
             if (!product) {
                 showToast('⚠️ Product not found', 'error');
                 return;
@@ -4521,11 +4493,11 @@ function deleteSale(saleId, saleUserId = null) {
             }
 
             showSyncingIndicator();
-            const firebaseKey = getProductFirebaseKey(product);
-            getRef('products/' + firebaseKey).remove()
+            const firebaseId = product.id;
+            getRef('products/' + firebaseId).remove()
                 .then(() => {
                     showToast('🗑️ Product deleted successfully!', 'success');
-                    products = products.filter(p => getProductFirebaseKey(p) !== firebaseKey);
+                    products = products.filter(p => p.id !== firebaseId);
                     renderProductList();
                     updateProductDropdown();
                 })
