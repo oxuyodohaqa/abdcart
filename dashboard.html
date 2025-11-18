@@ -3431,14 +3431,13 @@ function renderSubscriptionProducts() {
     }
     
     container.innerHTML = subscriptionProducts.map(product => {
-        const profiles = Array.isArray(product.profiles) ? product.profiles : [];
-        const availableCount = profiles.filter(p => !p.sold).length;
+        const availableCount = product.profiles.filter(p => !p.sold).length;
 
         const fullPrice = getNumericValue(product.fullPrice) ?? getNumericValue(product.sharedPrice);
         const profilePrice = getNumericValue(product.profilePrice) ?? getNumericValue(product.soloPrice);
         const sharedPrice = getNumericValue(product.sharedPrice);
         const buyPrice = getNumericValue(product.buyPrice);
-
+        
         return `
             <div class="subscription-product-item">
                 <div class="subscription-header">
