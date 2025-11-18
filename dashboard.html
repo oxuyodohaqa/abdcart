@@ -3116,6 +3116,12 @@ let accounts = []; // Store streaming service accounts
 let selectedProfile = null;
 let realAdmins = []; // Store real admins from Firebase
 let commissionBrackets = []; // Store commission bracket configuration
+
+function normalizeRole(role) {
+    if (!role) return 'admin';
+    const normalized = role.toString().trim().toLowerCase();
+    return normalized === 'owner' ? 'owner' : 'admin';
+}
     let settings = {
             theme: 'theme-purple',
             darkMode: false,
@@ -3461,6 +3467,7 @@ function selectProfile(number) {
             }
             
             currentSession = JSON.parse(session);
+            currentSession.role = normalizeRole(currentSession.role);
             currentUsername = currentSession.username;
             console.log('✅ Logged in as:', currentSession.customName);
             
@@ -3513,7 +3520,10 @@ function loadAllData() {
     // Load users
     getRef('users').on('value', (snapshot) => {
         const usersData = snapshot.val() || {};
-        users = Object.values(usersData);
+        users = Object.values(usersData).map(user => ({
+            ...user,
+            role: normalizeRole(user.role)
+        }));
         console.log('✅ Loaded users:', users.length);
         
         // Load real admins for product calculations

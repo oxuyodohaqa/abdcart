@@ -311,7 +311,7 @@
                     id: user.id,
                     username: user.username,
                     customName: user.customName,
-                    role: user.role,
+                    role: (user.role || 'admin').toString().trim().toLowerCase(),
                     profitPercent: user.profitPercent || 100
                 };
 
