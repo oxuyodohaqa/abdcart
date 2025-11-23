@@ -2919,46 +2919,6 @@ body.dark-mode .profile-select-btn {
         </div>
     </div>
 
-    <!-- Mark Paid Modal -->
-    <div class="modal" id="markPaidModal">
-        <div class="modal-content" style="max-width: 500px;">
-            <div class="modal-header">
-                <h2>✅ Mark as Paid</h2>
-                <button class="close-btn" onclick="closeMarkPaidModal()">✕</button>
-            </div>
-            
-            <form id="markPaidForm" onsubmit="confirmMarkAsPaid(event)">
-                <input type="hidden" id="payoutToMarkId">
-                <input type="hidden" id="payoutToMarkUserId">
-                <input type="hidden" id="payoutToMarkAmount">
-                
-                <div class="form-group">
-                    <label>💳 Payment Method</label>
-                    <select id="paymentMethod" required>
-                        <option value="">-- Select Method --</option>
-                        <option value="GCash">GCash</option>
-                        <option value="Bank Transfer">Bank Transfer</option>
-                        <option value="Cash">Cash</option>
-                        <option value="PayMaya">PayMaya</option>
-                        <option value="Other">Other</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label>🔢 Reference Number</label>
-                    <input type="text" id="paymentReference" placeholder="Transaction/Reference ID">
-                </div>
-                
-                <div class="form-group">
-                    <label>📝 Notes (Optional)</label>
-                    <textarea id="paymentNotes" rows="3" placeholder="Additional notes..."></textarea>
-                </div>
-                
-                <button type="submit" class="btn btn-success">✅ Confirm Payment</button>
-            </form>
-        </div>
-    </div>
-
     <!-- Edit Product Modal -->
     <div class="modal" id="editProductModal">
         <div class="modal-content" style="max-width: 600px;">
@@ -3058,6 +3018,10 @@ const firebaseConfig = {
         return database.ref(APP_NAME + '/' + path);
     }
 
+    function sanitizeUserKey(username) {
+        return (username || '').replace(/[.#$/[\]]/g, '_');
+    }
+
 console.log('✅ Firebase initialized for app:', APP_NAME);
 console.log('📂 All data will be stored in:', APP_NAME + '/');
 
@@ -3113,6 +3077,7 @@ let subscriptionProducts = [];
 let accounts = []; // Store streaming service accounts
 let selectedProfile = null;
 let realAdmins = []; // Store real admins from Firebase
+let editingSale = null; // Track sale being edited
 let commissionBrackets = []; // Store commission bracket configuration
     let settings = {
             theme: 'theme-purple',
@@ -3658,20 +3623,21 @@ function loadAllSalesData() {
         const userKey = currentSession.username.replace(/[.#$/[\]]/g, '_');
         console.log('👤 Admin loading sales from path:', 'sales/' + userKey);
         
-        getRef('sales/' + userKey).on('value', (snapshot) => {
-            const salesData = snapshot.val() || {};
-            sales = [];
+                getRef('sales/' + userKey).on('value', (snapshot) => {
+                    const salesData = snapshot.val() || {};
+                    sales = [];
             
             console.log('📊 Admin sales data:', salesData);
             
-            Object.keys(salesData).forEach(saleKey => {
-                const sale = salesData[saleKey];
-                sale.id = saleKey;
-                sale.userName = currentSession.customName;
-                sale.userId = currentSession.id;
-                sale.userRole = currentSession.role;
-                sales.push(sale);
-            });
+                    Object.keys(salesData).forEach(saleKey => {
+                        const sale = salesData[saleKey];
+                        sale.id = saleKey;
+                        sale.userName = currentSession.customName;
+                        sale.userId = currentSession.id;
+                        sale.userRole = currentSession.role;
+                        sale.userKey = userKey;
+                        sales.push(sale);
+                    });
             
             console.log('✅ Admin loaded sales:', sales.length);
             calculateStats();
@@ -4247,113 +4213,44 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
             document.getElementById('totalEarningsCard').style.display = 'block';
         }
 
-// DELETE SALE - FIXED FOR OWNER DELETING ADMIN SALES
-function deleteSale(saleId, saleUserId = null) {
-    console.log('🔍 Delete called for sale:', saleId, 'User ID:', saleUserId);
-    
-    // Determine the correct Firebase path
-    let saleRef;
-    let userKey;
-
-    if (currentSession.role === 'owner' && saleUserId && saleUserId !== currentSession.id) {
-        // Owner deleting admin sale - find admin's username
-        const adminUser = users.find(u => u.id === saleUserId);
-        if (adminUser) {
-            userKey = adminUser.username.replace(/[.#$/[\]]/g, '_');
-            saleRef = getRef(`sales/${userKey}/${saleId}`);
-            console.log('👑 Owner deleting admin sale, path:', `sales/${userKey}/${saleId}`);
-        } else {
-            showToast('❌ Could not find admin user', 'error');
-            return;
-        }
-    } else {
-        // Regular deletion (own sales)
-        userKey = currentSession.username.replace(/[.#$/[\]]/g, '_');
-        saleRef = getRef(`sales/${userKey}/${saleId}`);
-        console.log('👤 Deleting own sale, path:', `sales/${userKey}/${saleId}`);
+// DELETE SALE - honor ownership and correct Firebase path
+function deleteSale(saleId) {
+    const sale = sales.find(s => String(s.id) === String(saleId));
+    if (!sale) {
+        showToast('❌ Sale not found', 'error');
+        return;
     }
-    
-    // First, check if sale exists and get its data
-    saleRef.once('value').then((snapshot) => {
-        const sale = snapshot.val();
-        if (!sale) {
-            showToast('❌ Sale not found', 'error');
-            return;
-        }
 
-        console.log('📦 Sale data:', sale);
-        
-        // Get creator info
-        const saleCreatorId = sale.userId;
-        const saleCreatorRole = sale.userRole;
-        const currentUserId = currentSession.id;
-        const currentUserRole = currentSession.role;
+    const userKey = sale.userKey || sanitizeUserKey(sale.soldBy || sale.recordedBy || currentSession.username);
+    const saleRef = getRef(`sales/${userKey}/${saleId}`);
 
-        console.log('👤 Sale creator:', saleCreatorId, saleCreatorRole);
-        console.log('🎯 Current user:', currentUserId, currentUserRole);
+    const currentUserRole = currentSession.role;
+    const isOwner = currentUserRole === 'owner';
+    const canDelete = isOwner || sale.userId === currentSession.id;
 
-        // FIXED PERMISSION CHECK - OWNER CAN DELETE ADMIN SALES
-        let canDelete = false;
+    if (!canDelete) {
+        showToast('❌ You cannot delete this sale', 'error');
+        return;
+    }
 
-        if (currentUserRole === 'owner') {
-            // ✅ OWNER: Can delete ANY sale (admin sales, user sales, own sales)
-            canDelete = true;
-            console.log('✅ Owner permission granted - can delete any sale');
-        } 
-        else if (currentUserRole === 'admin') {
-            // ✅ ADMIN: Can delete their own sales ONLY
-            canDelete = (saleCreatorId === currentUserId);
-            console.log('🔧 Admin permission:', canDelete);
-        } 
-        else {
-            // ✅ USER: Can delete their own sales ONLY
-            canDelete = (saleCreatorId === currentUserId);
-            console.log('👤 User permission:', canDelete);
-        }
+    const productLabel = sale.productName || sale.product || 'this sale';
+    if (!confirm(`🗑️ Delete ${productLabel}?`)) {
+        return;
+    }
 
-        if (!canDelete) {
-            const errorMsg = `🚫 Permission Denied!\nYour Role: ${currentUserRole}\nSale Creator: ${saleCreatorRole || 'Unknown'}`;
-            alert(errorMsg);
-            showToast('❌ You cannot delete this sale', 'error');
-            return;
-        }
-
-        // CONFIRM DELETION
-        if (!confirm(`🗑️ Delete this sale?\nProduct: ${sale.productName || sale.product}\nBuyer: ${sale.buyerUsername}`)) {
-            return;
-        }
-
-        // DELETE FROM FIREBASE
-        saleRef.remove()
-            .then(() => {
-                console.log('✅ Sale deleted from Firebase');
-                
-                // SUCCESS MESSAGE
-                showToast('🗑️ Sale deleted', 'success');
-                autoCalculatePayouts();
-                
-                // REMOVE FROM UI
-                const saleRow = document.querySelector(`[data-sale-id="${saleId}"]`);
-                if (saleRow) {
-                    saleRow.remove();
-                    console.log('✅ Removed from UI');
-                } else {
-                    console.log('🔄 Row not found, refreshing table...');
-                    renderSalesTable(); // Refresh entire table
-                }
-                
-                // Also remove from local sales array to keep sync
-                sales = sales.filter(s => s.id !== saleId);
-                calculateStats(); // Update stats
-            })
-            .catch((error) => {
-                console.error('❌ Firebase error:', error);
-                showToast('❌ Error deleting sale: ' + error.message, 'error');
-            });
-    }).catch((error) => {
-        console.error('❌ Fetch error:', error);
-        showToast('❌ Error fetching sale: ' + error.message, 'error');
-    });
+    showSyncingIndicator();
+    saleRef.remove()
+        .then(() => {
+            showToast('🗑️ Sale deleted', 'success');
+            sales = sales.filter(s => String(s.id) !== String(saleId));
+            calculateStats();
+            renderSalesTable();
+            autoCalculatePayouts();
+        })
+        .catch((error) => {
+            console.error('❌ Firebase error:', error);
+            showToast('❌ Error deleting sale: ' + error.message, 'error');
+        });
 }
         // Edit Product
         function editProduct(productId) {
@@ -4444,21 +4341,57 @@ function deleteSale(saleId, saleUserId = null) {
         }
 
         // =================== SALES MANAGEMENT ===================
-        
+
         // Add Sale
         document.getElementById('addSaleForm').addEventListener('submit', function(e) {
             e.preventDefault();
-            
+
+            const isEditing = !!editingSale;
+            const originalUserKey = isEditing
+                ? (editingSale.userKey || sanitizeUserKey(editingSale.soldBy || editingSale.recordedBy || currentSession.username))
+                : null;
+
+            const resolveOwnerContext = (usernameFallback, saleFallback = null) => {
+                if (saleFallback) {
+                    const matchByKey = users.find(u => sanitizeUserKey(u.username) === (saleFallback.userKey || ''));
+                    if (matchByKey) {
+                        return {
+                            username: matchByKey.username,
+                            userKey: saleFallback.userKey || sanitizeUserKey(matchByKey.username),
+                            id: saleFallback.userId || matchByKey.id,
+                            name: saleFallback.userName || matchByKey.customName || matchByKey.username,
+                            role: saleFallback.userRole || matchByKey.role
+                        };
+                    }
+                }
+
+                const username = usernameFallback || currentSession.username;
+                const userRecord = users.find(u => u.username === username) || currentSession;
+
+                return {
+                    username: username,
+                    userKey: sanitizeUserKey(username),
+                    id: userRecord.id || currentSession.id,
+                    name: userRecord.customName || userRecord.username || currentSession.customName,
+                    role: userRecord.role || currentSession.role
+                };
+            };
+
             const productId = parseInt(document.getElementById('productSelect').value);
-            
+
             if (!productId) {
                 showToast('⚠️ Please select a product', 'error');
                 return;
             }
-            
+
             const product = products.find(p => p.id === productId);
             const isStreaming = STREAMING_CATEGORIES.includes(product.category);
-            
+
+            const timestamp = Date.now();
+            const saleId = isEditing ? editingSale.id : timestamp;
+            const saleTimestamp = isEditing && editingSale.timestamp ? editingSale.timestamp : timestamp;
+            const editingId = isEditing ? String(editingSale.id) : null;
+
             // Check if profile tracking fields are shown
             if (isStreaming && document.getElementById('profileTrackingFields').style.display !== 'none') {
                 // Validate profile tracking fields
@@ -4508,9 +4441,10 @@ function deleteSale(saleId, saleUserId = null) {
                 
                 // Check for overselling - validate slot availability
                 const maxSlots = profileType.value === 'Solo' ? 1 : 2;
-                const existingSales = sales.filter(s => 
-                    s.accountId === accountId && 
-                    s.profileNumber === parseInt(profileNumber)
+                const existingSales = sales.filter(s =>
+                    s.accountId === accountId &&
+                    s.profileNumber === parseInt(profileNumber) &&
+                    String(s.id) !== editingId
                 );
                 
                 if (existingSales.length >= maxSlots) {
@@ -4547,21 +4481,24 @@ function deleteSale(saleId, saleUserId = null) {
                 const price = parseFloat(document.getElementById('productPrice').textContent.replace('₱', ''));
 
                 // Calculate commission based on who sold the slot
-                const soldByUser = users.find(u => u.username === soldBy);
+                const saleOwnerContext = isEditing
+                    ? resolveOwnerContext(soldBy, editingSale)
+                    : resolveOwnerContext(soldBy);
+                const soldByUser = users.find(u => u.username === saleOwnerContext.username);
                 const actualProfit = product.sellPrice - product.buyPrice;
-                const sellerIsOwner = soldByUser ? soldByUser.role === 'owner' : currentSession.role === 'owner';
+                const sellerIsOwner = saleOwnerContext.role === 'owner';
                 const commissionRate = sellerIsOwner ? 100 : getCommissionRateForProfit(actualProfit);
                 const commissionAmount = sellerIsOwner ? actualProfit : (actualProfit * commissionRate) / 100;
                 const ownerProfit = actualProfit - commissionAmount;
 
-                const timestamp = Date.now();
-                const saleOwnerUsername = soldBy || currentSession.username;
+                const saleOwnerUsername = saleOwnerContext.username;
                 const saleOwner = users.find(u => u.username === saleOwnerUsername) || currentSession;
 
                 const newSale = {
-                    id: timestamp,
-                    userId: saleOwner.id || currentSession.id,
-                    userName: saleOwner.customName || saleOwner.username || currentSession.customName,
+                    id: saleId,
+                    userId: saleOwnerContext.id || saleOwner.id || currentSession.id,
+                    userName: saleOwnerContext.name || saleOwner.customName || saleOwner.username || currentSession.customName,
+                    userRole: saleOwnerContext.role || saleOwner.role || currentSession.role,
                     productId: productId,
                     productName: product.name,
                     accountId: accountId,
@@ -4585,19 +4522,30 @@ function deleteSale(saleId, saleUserId = null) {
                     totalCommission: commissionAmount * quantity,
                     sold: true,
                     date: new Date().toISOString().split('T')[0],
-                    timestamp: timestamp
+                    timestamp: saleTimestamp,
+                    userKey: saleOwnerContext.userKey
                 };
 
-                const userKey = saleOwnerUsername.replace(/[.#$/[\]]/g, '_');
+                const userKey = saleOwnerContext.userKey;
+                const targetRef = getRef('sales/' + userKey + '/' + newSale.id);
                 showSyncingIndicator();
-                getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
+
+                let savePromise = targetRef.set(newSale);
+                if (isEditing && originalUserKey && originalUserKey !== userKey) {
+                    savePromise = savePromise.then(() => getRef('sales/' + originalUserKey + '/' + newSale.id).remove());
+                }
+
+                savePromise
                     .then(() => {
                         document.getElementById('addSaleForm').reset();
                         document.getElementById('productDetailsCard').style.display = 'none';
                         document.getElementById('totalEarningsCard').style.display = 'none';
                         document.getElementById('profileStatusDisplay').style.display = 'none';
                         document.getElementById('profileTrackingFields').style.display = 'none';
-                        showToast('✅ Sale added successfully!', 'success');
+                        const submitBtn = document.querySelector('#addSaleForm button[type="submit"]');
+                        if (submitBtn) submitBtn.textContent = '➕ ADD SALE';
+                        editingSale = null;
+                        showToast(isEditing ? '✅ Sale updated!' : '✅ Sale added successfully!', 'success');
                         autoCalculatePayouts();
                     })
                     .catch((error) => {
@@ -4644,18 +4592,26 @@ function deleteSale(saleId, saleUserId = null) {
                 
                 // Calculate profit first: Profit = Sales - Capital
                 const actualProfit = product.sellPrice - product.buyPrice;
-                
+
+                const saleOwnerContext = isEditing
+                    ? resolveOwnerContext(currentSession.username, editingSale)
+                    : resolveOwnerContext(currentSession.username);
+
                 // Use bracket-based commission for admins or 100% for owner
-                const userCommissionPercent = currentSession.role === 'owner' ? 100 : getCommissionRateForProfit(actualProfit);
-                
+                const userCommissionPercent = saleOwnerContext.role === 'owner' ? 100 : getCommissionRateForProfit(actualProfit);
+
                 // Calculate salary: Salary = Profit × Rate (%)
                 const commissionAmount = (actualProfit * userCommissionPercent) / 100;
-                const yourProfit = currentSession.role === 'owner' ? actualProfit : commissionAmount;
-                
+                const yourProfit = saleOwnerContext.role === 'owner' ? actualProfit : commissionAmount;
+
                 const newSale = {
-                    id: Date.now(),
-                    userId: currentSession.id,
-                    userName: currentSession.customName,
+                    id: saleId,
+                    userId: saleOwnerContext.id,
+                    userName: saleOwnerContext.name,
+                    userRole: saleOwnerContext.role,
+                    userKey: saleOwnerContext.userKey,
+                    soldBy: saleOwnerContext.username,
+                    recordedBy: currentSession.username,
                     productId: productId,
                     productName: product.name,
                     buyerUsername: document.getElementById('buyerUsernameInput').value,
@@ -4670,19 +4626,30 @@ function deleteSale(saleId, saleUserId = null) {
                     totalPrice: price * quantity,
                     totalCommission: yourProfit * quantity,
                     sold: document.getElementById('productSoldStatus').value === 'yes',
-                    date: new Date().toISOString().split('T')[0]
+                    date: new Date().toISOString().split('T')[0],
+                    timestamp: saleTimestamp
                 };
-                
-                const userKey = currentSession.username.replace(/[.#$/[\]]/g, '_');
+
+                const userKey = saleOwnerContext.userKey;
+                const targetRef = getRef('sales/' + userKey + '/' + newSale.id);
                 showSyncingIndicator();
-                getRef('sales/' + userKey + '/' + newSale.id).set(newSale)
+
+                let savePromise = targetRef.set(newSale);
+                if (isEditing && originalUserKey && originalUserKey !== userKey) {
+                    savePromise = savePromise.then(() => getRef('sales/' + originalUserKey + '/' + newSale.id).remove());
+                }
+
+                savePromise
                     .then(() => {
                         document.getElementById('addSaleForm').reset();
                         document.getElementById('buyerUsernameInput').value = '';
                         document.getElementById('accountEmailInput').value = '';
                         document.getElementById('productDetailsCard').style.display = 'none';
                         document.getElementById('totalEarningsCard').style.display = 'none';
-                        showToast('✅ Sale added successfully!', 'success');
+                        const submitBtn = document.querySelector('#addSaleForm button[type="submit"]');
+                        if (submitBtn) submitBtn.textContent = '➕ ADD SALE';
+                        editingSale = null;
+                        showToast(isEditing ? '✅ Sale updated!' : '✅ Sale added successfully!', 'success');
                         autoCalculatePayouts();
                     })
                     .catch((error) => {
@@ -4861,28 +4828,6 @@ function deleteSale(saleId, saleUserId = null) {
                 });
         }
 
-function deleteSale(id) {
-    if (!confirm('Delete this sale?')) return;
-    
-    const sale = sales.find(s => s.id === id);
-    if (!sale) return;
-    
-    // FIX: Use the same method as when adding sales
-    const userKey = (sale.soldBy || currentSession.username).replace(/[.#$[\]]/g, '_');
-    
-    console.log('Deleting sale from path:', 'sales/' + userKey + '/' + id);
-    
-    getRef('sales/' + userKey + '/' + id).remove()
-        .then(() => {
-            showToast('🗑️ Sale deleted', 'info');
-            autoCalculatePayouts();
-        })
-        .catch((error) => {
-            console.error('Delete error:', error);
-            showToast('❌ Error: ' + error.message, 'error');
-        });
-}
-
 function editSale(id) {
     const sale = sales.find(s => s.id === id);
     if (!sale) return;
@@ -4895,8 +4840,33 @@ function editSale(id) {
     document.getElementById('productSoldStatus').value = sale.sold ? 'yes' : 'no';
     document.getElementById('buyerUsernameInput').value = sale.buyerUsername || '';
     document.getElementById('accountEmailInput').value = sale.accountEmail || '';
-    
-    deleteSale(id, sale.userId);
+
+    // Streaming/profile-based sale fields
+    if (sale.accountId) {
+        document.getElementById('profileTrackingFields').style.display = 'block';
+        document.getElementById('accountIdSelect').value = sale.accountId;
+        document.getElementById('profileNumberSelect').value = sale.profileNumber || '';
+        document.getElementById('profileNameInput').value = sale.profileName || '';
+
+        if (sale.profileType) {
+            const profileTypeRadio = document.querySelector(`input[name="profileType"][value="${sale.profileType}"]`);
+            if (profileTypeRadio) profileTypeRadio.checked = true;
+        }
+
+        const soldBySelect = document.getElementById('soldBySelect');
+        if (soldBySelect && sale.soldBy) {
+            soldBySelect.value = sale.soldBy;
+        }
+
+        updateProfileStatus();
+    }
+
+    editingSale = { ...sale };
+    const submitBtn = document.querySelector('#addSaleForm button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.textContent = '💾 Save Sale';
+    }
+
     document.getElementById('addSaleForm').scrollIntoView({ behavior: 'smooth' });
     showToast('📝 Edit mode - Update and save', 'info');
 }
