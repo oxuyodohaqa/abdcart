@@ -2569,13 +2569,13 @@ body.dark-mode .profile-select-btn {
             
             <!-- Payout Period Filter -->
             <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
-                <button class="filter-btn active" id="payoutPeriodAll" onclick="setPayoutPeriod('all')">📊 All Time</button>
-                <button class="filter-btn" id="payoutPeriodWeek" onclick="setPayoutPeriod('week')">📅 This Week</button>
-                <button class="filter-btn" id="payoutPeriodMonth" onclick="setPayoutPeriod('month')">📆 This Month</button>
+                <button class="filter-btn active" id="payoutPeriodAllMain" data-payout-period-btn="Main" onclick="setPayoutPeriod('all', 'Main')">📊 All Time</button>
+                <button class="filter-btn" id="payoutPeriodWeekMain" data-payout-period-btn="Main" onclick="setPayoutPeriod('week', 'Main')">📅 This Week</button>
+                <button class="filter-btn" id="payoutPeriodMonthMain" data-payout-period-btn="Main" onclick="setPayoutPeriod('month', 'Main')">📆 This Month</button>
                 <button class="btn btn-info" onclick="openPayoutHistory()">📜 View History</button>
             </div>
 
-            <div class="payout-list" id="payoutList"></div>
+            <div class="payout-list" id="payoutListMain"></div>
         </div>
     </div>
 
@@ -2908,12 +2908,12 @@ body.dark-mode .profile-select-btn {
             </div>
             
             <div class="period-tabs" style="margin-bottom: 20px;">
-                <button class="period-tab active" id="payoutPeriodAll" onclick="setPayoutPeriod('all')">📊 All Time</button>
-                <button class="period-tab" id="payoutPeriodWeek" onclick="setPayoutPeriod('week')">📅 This Week</button>
-                <button class="period-tab" id="payoutPeriodMonth" onclick="setPayoutPeriod('month')">📆 This Month</button>
+                <button class="period-tab active" id="payoutPeriodAllModal" data-payout-period-btn="Modal" onclick="setPayoutPeriod('all', 'Modal')">📊 All Time</button>
+                <button class="period-tab" id="payoutPeriodWeekModal" data-payout-period-btn="Modal" onclick="setPayoutPeriod('week', 'Modal')">📅 This Week</button>
+                <button class="period-tab" id="payoutPeriodMonthModal" data-payout-period-btn="Modal" onclick="setPayoutPeriod('month', 'Modal')">📆 This Month</button>
             </div>
-            
-            <div id="payoutList" class="payout-list">
+
+            <div id="payoutListModal" class="payout-list">
                 <!-- Payout items will be dynamically generated -->
             </div>
         </div>
@@ -3525,7 +3525,7 @@ function loadAllData() {
     getRef('payouts').on('value', (snapshot) => {
         const payData = snapshot.val() || {};
         payouts = Object.values(payData);
-        renderPayoutList();
+        refreshPayoutViews();
         autoCalculatePayouts();
     });
 
@@ -4829,7 +4829,7 @@ function deleteSale(saleId) {
         }
 
 function editSale(id) {
-    const sale = sales.find(s => s.id === id);
+    const sale = sales.find(s => String(s.id) === String(id));
     if (!sale) return;
     
     document.getElementById('productSelect').value = sale.productId;
@@ -5227,28 +5227,36 @@ return `
 
         function openPayoutModal() {
             document.getElementById('payoutModal').classList.add('show');
-            renderPayoutList();
+            setPayoutPeriod(currentPayoutPeriod, 'Modal');
+            renderPayoutList('payoutListModal');
         }
 
         function closePayoutModal() {
             document.getElementById('payoutModal').classList.remove('show');
         }
 
-        function setPayoutPeriod(period) {
+        function setPayoutPeriod(period, target = 'Main') {
             currentPayoutPeriod = period;
-            
+
             // Update button states
-            document.querySelectorAll('#payoutPeriodAll, #payoutPeriodWeek, #payoutPeriodMonth').forEach(btn => {
+            document.querySelectorAll(`[data-payout-period-btn="${target}"]`).forEach(btn => {
                 btn.classList.remove('active');
             });
-            document.getElementById('payoutPeriod' + period.charAt(0).toUpperCase() + period.slice(1)).classList.add('active');
-            
+
+            const activeButton = document.getElementById('payoutPeriod' + period.charAt(0).toUpperCase() + period.slice(1) + target);
+            if (activeButton) {
+                activeButton.classList.add('active');
+            }
+
             autoCalculatePayouts();
+            refreshPayoutViews();
         }
 
-        function renderPayoutList() {
-            const payoutList = document.getElementById('payoutList');
-            
+        function renderPayoutList(targetId = 'payoutListMain') {
+            const payoutList = document.getElementById(targetId);
+
+            if (!payoutList) return;
+
             if (payouts.length === 0) {
                 payoutList.innerHTML = '<div class="empty-state"><div class="empty-icon">💰</div><p>No payouts yet</p></div>';
                 return;
@@ -5311,6 +5319,11 @@ return `
             if (filteredPayouts.length === 0) {
                 payoutList.innerHTML = '<div class="empty-state"><div class="empty-icon">💰</div><p>No pending payouts</p></div>';
             }
+        }
+
+        function refreshPayoutViews() {
+            renderPayoutList('payoutListMain');
+            renderPayoutList('payoutListModal');
         }
 
         function openMarkPaidModal(payoutId, userId, amount) {
@@ -5571,7 +5584,7 @@ return `
                 btnUsers.addEventListener('click', () => {
                     document.getElementById('userModal').classList.add('show');
                     renderUserList();
-                    renderPayoutList();
+                    refreshPayoutViews();
                 });
             }
             
