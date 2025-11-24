@@ -3413,7 +3413,7 @@ function selectProfile(number) {
             loadAllData();
             applySettings();
             // ✅ FIXED: Setup event listeners AFTER DOM is ready
-            setTimeout(setupEventListeners, 100);
+            setupEventListeners();
         }
 
         function checkAuth() {
@@ -3523,8 +3523,11 @@ function loadAllData() {
     
     // Load payouts
     getRef('payouts').on('value', (snapshot) => {
-        const payData = snapshot.val() || {};
-        payouts = Object.values(payData);
+        payouts = [];
+        snapshot.forEach(child => {
+            const payoutData = child.val() || {};
+            payouts.push({ id: payoutData.id || child.key, ...payoutData });
+        });
         refreshPayoutViews();
         autoCalculatePayouts();
     });
@@ -4160,7 +4163,7 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
             }
         });
 
-        function displayProductDetails(productId) {
+function displayProductDetails(productId) {
             if (!productId) {
                 document.getElementById('productDetailsCard').style.display = 'none';
                 document.getElementById('totalEarningsCard').style.display = 'none';
@@ -4172,31 +4175,37 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
             
             const quantity = parseInt(document.getElementById('productQuantity').value) || 1;
             
-            // Calculate prices
-            const buyPrice = product.buyPrice;
-            const sellPrice = product.sellPrice;
-            const margin = product.margin;
-            
-            // Calculate profit first: Profit = Sales - Capital
-            const actualProfit = sellPrice - buyPrice;
-            
-            // Get commission rate based on brackets (for admins) or use 100% for owner
-            let userCommissionPercent;
-            if (currentSession.role === 'owner') {
-                userCommissionPercent = 100; // Owner gets 100% of profit
-            } else {
-                // For admins, use bracket-based commission or fallback to profitPercent
-                userCommissionPercent = getCommissionRateForProfit(actualProfit);
-            }
-            
-            // Calculate commission: Salary = Profit × Rate (%)
-            const commissionPerUnit = (actualProfit * userCommissionPercent) / 100;
-            
-            // Display price (what customer pays)
-            const userPrice = sellPrice;
-            
-            // Commission amount (what user earns)
-            const yourCommission = currentSession.role === 'owner' ? actualProfit : commissionPerUnit;
+    // Calculate prices
+    const buyPrice = product.buyPrice;
+    const sellPrice = product.sellPrice;
+    const margin = product.margin;
+
+    // Calculate profit first: Profit = Sales - Capital
+    const actualProfit = sellPrice - buyPrice;
+
+    // Get commission rate based on brackets (for admins) or use 100% for owner
+    let userCommissionPercent;
+    if (currentSession.role === 'owner') {
+        userCommissionPercent = 100; // Owner gets 100% of profit
+    } else {
+        // For admins, use bracket-based commission or fallback to profitPercent
+        userCommissionPercent = getCommissionRateForProfit(actualProfit);
+    }
+
+    // Calculate commission: Salary = Profit × Rate (%)
+    let commissionPerUnit = (actualProfit * userCommissionPercent) / 100;
+
+    // Display price (what customer pays)
+    let userPrice = sellPrice;
+
+    // If editing an existing sale, respect the original recorded price/commission
+    if (editingSale && editingSale.productId === productId) {
+        userPrice = parseFloat(editingSale.price) || sellPrice;
+        commissionPerUnit = parseFloat(editingSale.commission) || commissionPerUnit;
+    }
+
+    // Commission amount (what user earns)
+    const yourCommission = currentSession.role === 'owner' ? actualProfit : commissionPerUnit;
             
             // Update single unit display
             document.getElementById('productPrice').textContent = '₱' + userPrice.toFixed(2);
@@ -4831,15 +4840,45 @@ function deleteSale(saleId) {
 function editSale(id) {
     const sale = sales.find(s => String(s.id) === String(id));
     if (!sale) return;
-    
+
+    editingSale = { ...sale };
+
     document.getElementById('productSelect').value = sale.productId;
+    document.getElementById('productQuantity').value = sale.quantity;
     displayProductDetails(sale.productId);
     document.querySelector(`input[name="warranty"][value="${sale.warranty}"]`).checked = true;
     document.querySelector(`input[name="accountType"][value="${sale.accountType}"]`).checked = true;
-    document.getElementById('productQuantity').value = sale.quantity;
     document.getElementById('productSoldStatus').value = sale.sold ? 'yes' : 'no';
     document.getElementById('buyerUsernameInput').value = sale.buyerUsername || '';
     document.getElementById('accountEmailInput').value = sale.accountEmail || '';
+
+    const priceDisplay = document.getElementById('productPrice');
+    const marginDisplay = document.getElementById('productMargin');
+    const commissionDisplay = document.getElementById('productCommission');
+    const totalPriceDisplay = document.getElementById('totalPrice');
+    const totalEarningsDisplay = document.getElementById('totalEarnings');
+
+    if (priceDisplay) {
+        priceDisplay.textContent = '₱' + Number(sale.price || sale.sellPrice || 0).toFixed(2);
+    }
+    if (marginDisplay && sale.sellPrice && sale.buyPrice) {
+        const margin = ((sale.sellPrice - sale.buyPrice) / sale.buyPrice) * 100;
+        marginDisplay.textContent = isFinite(margin) ? margin.toFixed(2) + '%' : '0%';
+    }
+    if (commissionDisplay) {
+        const profit = sale.sellPrice && sale.buyPrice ? sale.sellPrice - sale.buyPrice : sale.commission;
+        const rate = profit ? ((sale.commission || 0) / profit) * 100 : 0;
+        commissionDisplay.textContent = `₱${Number(sale.commission || 0).toFixed(2)} (${rate.toFixed(1)}%)`;
+    }
+    if (totalPriceDisplay) {
+        totalPriceDisplay.textContent = '₱' + Number(sale.totalPrice || (sale.price * sale.quantity) || 0).toFixed(2);
+    }
+    if (totalEarningsDisplay) {
+        totalEarningsDisplay.textContent = '₱' + Number((sale.commission || 0) * (sale.quantity || 1)).toFixed(2);
+    }
+
+    document.getElementById('productDetailsCard').style.display = 'block';
+    document.getElementById('totalEarningsCard').style.display = 'block';
 
     // Streaming/profile-based sale fields
     if (sale.accountId) {
@@ -4861,7 +4900,6 @@ function editSale(id) {
         updateProfileStatus();
     }
 
-    editingSale = { ...sale };
     const submitBtn = document.querySelector('#addSaleForm button[type="submit"]');
     if (submitBtn) {
         submitBtn.textContent = '💾 Save Sale';
@@ -5159,7 +5197,7 @@ return `
         <td>${sale.quantity}</td>
         <td class="amount-cell">₱${sale.price.toFixed(2)}</td>
         <td class="amount-cell">₱${sale.totalPrice.toFixed(2)}</td>
-        <td><span class="sold-check">✅</span></td>
+        <td><span class="sold-check">${sale.sold ? '✅' : '⏳'}</span></td>
         <td>
             <button class="action-btn edit-btn" onclick="editSale(${sale.id})">✏️</button>
             <button class="action-btn delete-btn" onclick="deleteSale('${sale.id}', '${sale.userId}')">🗑️</button>
