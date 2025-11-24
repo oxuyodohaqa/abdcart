@@ -1860,7 +1860,10 @@ body.dark-mode .profile-select-btn {
                 <div id="productDetailsCard" class="price-info-card" style="display: none;">
                     <div class="price-info-row">
                         <span class="price-info-label">💵 Your Price</span>
-                        <span class="price-info-value" id="productPrice">₱0</span>
+                        <div style="display: flex; gap: 10px; align-items: center; width: 100%;">
+                            <input type="number" id="productPriceInput" min="0" step="0.01" style="flex: 1; padding: 10px; border-radius: 12px; border: 3px solid var(--border-color); background: var(--light); font-weight: 700; color: var(--text-color);">
+                            <span class="price-info-value" id="productPrice">₱0</span>
+                        </div>
                     </div>
                     <div class="price-info-row">
                         <span class="price-info-label">📊 Margin</span>
@@ -4163,6 +4166,16 @@ document.querySelectorAll('input[name="saleType"]').forEach(radio => {
             }
         });
 
+        const productPriceInput = document.getElementById('productPriceInput');
+        if (productPriceInput) {
+            productPriceInput.addEventListener('input', function() {
+                const productId = parseInt(document.getElementById('productSelect').value);
+                if (productId) {
+                    displayProductDetails(productId);
+                }
+            });
+        }
+
 function displayProductDetails(productId) {
             if (!productId) {
                 document.getElementById('productDetailsCard').style.display = 'none';
@@ -4174,6 +4187,7 @@ function displayProductDetails(productId) {
             if (!product) return;
             
             const quantity = parseInt(document.getElementById('productQuantity').value) || 1;
+            const priceInput = document.getElementById('productPriceInput');
             
     // Calculate prices
     const buyPrice = product.buyPrice;
@@ -4204,10 +4218,21 @@ function displayProductDetails(productId) {
         commissionPerUnit = parseFloat(editingSale.commission) || commissionPerUnit;
     }
 
+    // Allow manual overrides when needed
+    if (priceInput && priceInput.value) {
+        const manualPrice = parseFloat(priceInput.value);
+        if (!isNaN(manualPrice)) {
+            userPrice = manualPrice;
+        }
+    }
+
     // Commission amount (what user earns)
     const yourCommission = currentSession.role === 'owner' ? actualProfit : commissionPerUnit;
             
             // Update single unit display
+            if (priceInput) {
+                priceInput.value = userPrice.toFixed(2);
+            }
             document.getElementById('productPrice').textContent = '₱' + userPrice.toFixed(2);
             document.getElementById('productMargin').textContent = margin.toFixed(2) + '%';
             document.getElementById('productCommission').textContent = '₱' + yourCommission.toFixed(2) + ' (' + userCommissionPercent.toFixed(1) + '%)';
@@ -4487,7 +4512,10 @@ function deleteSale(saleId) {
                 }
 
                 const quantity = 1; // Always 1 for profile sales
-                const price = parseFloat(document.getElementById('productPrice').textContent.replace('₱', ''));
+                const priceInput = document.getElementById('productPriceInput');
+                const price = priceInput && priceInput.value
+                    ? parseFloat(priceInput.value)
+                    : parseFloat(document.getElementById('productPrice').textContent.replace('₱', ''));
 
                 // Calculate commission based on who sold the slot
                 const saleOwnerContext = isEditing
@@ -4551,6 +4579,8 @@ function deleteSale(saleId) {
                         document.getElementById('totalEarningsCard').style.display = 'none';
                         document.getElementById('profileStatusDisplay').style.display = 'none';
                         document.getElementById('profileTrackingFields').style.display = 'none';
+                        const priceInputEl = document.getElementById('productPriceInput');
+                        if (priceInputEl) priceInputEl.value = '';
                         const submitBtn = document.querySelector('#addSaleForm button[type="submit"]');
                         if (submitBtn) submitBtn.textContent = '➕ ADD SALE';
                         editingSale = null;
@@ -4597,7 +4627,10 @@ function deleteSale(saleId) {
                 }
                 
                 const quantity = parseInt(document.getElementById('productQuantity').value);
-                const price = parseFloat(document.getElementById('productPrice').textContent.replace('₱', ''));
+                const priceInput = document.getElementById('productPriceInput');
+                const price = priceInput && priceInput.value
+                    ? parseFloat(priceInput.value)
+                    : parseFloat(document.getElementById('productPrice').textContent.replace('₱', ''));
                 
                 // Calculate profit first: Profit = Sales - Capital
                 const actualProfit = product.sellPrice - product.buyPrice;
@@ -4655,6 +4688,8 @@ function deleteSale(saleId) {
                         document.getElementById('accountEmailInput').value = '';
                         document.getElementById('productDetailsCard').style.display = 'none';
                         document.getElementById('totalEarningsCard').style.display = 'none';
+                        const priceInputEl = document.getElementById('productPriceInput');
+                        if (priceInputEl) priceInputEl.value = '';
                         const submitBtn = document.querySelector('#addSaleForm button[type="submit"]');
                         if (submitBtn) submitBtn.textContent = '➕ ADD SALE';
                         editingSale = null;
@@ -4841,7 +4876,10 @@ function editSale(id) {
     const sale = sales.find(s => String(s.id) === String(id));
     if (!sale) return;
 
-    editingSale = { ...sale };
+    editingSale = {
+        ...sale,
+        userKey: sale.userKey || sanitizeUserKey(sale.soldBy || sale.recordedBy || sale.userName || currentSession.username)
+    };
 
     document.getElementById('productSelect').value = sale.productId;
     document.getElementById('productQuantity').value = sale.quantity;
@@ -5414,6 +5452,7 @@ return `
                 .then(() => {
                     showToast('✅ Payout marked as paid and saved to history!', 'success');
                     closeMarkPaidModal();
+                    refreshPayoutViews();
                     autoCalculatePayouts();
                 })
                 .catch((error) => {
