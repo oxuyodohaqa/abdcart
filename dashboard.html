@@ -3503,10 +3503,27 @@ function loadAllData() {
         loadAllSalesData();
     });
     
-    // Load products
+    // Load products with their Firebase keys so edits map correctly
     getRef('products').on('value', (snapshot) => {
-        const productsData = snapshot.val() || {};
-        products = Object.values(productsData);
+        products = [];
+
+        snapshot.forEach(child => {
+            const productData = child.val() || {};
+
+            // Always keep a stable string id based on the Firebase key
+            products.push({
+                id: child.key,
+                margin: 0,
+                ...productData,
+                // Recalculate margin if missing to keep UI in sync
+                margin: typeof productData.margin === 'number'
+                    ? productData.margin
+                    : productData.buyPrice
+                        ? ((productData.sellPrice - productData.buyPrice) / productData.buyPrice) * 100
+                        : 0
+            });
+        });
+
         console.log('✅ Loaded products:', products.length);
         updateProductDropdown();
         // Both owners and admins can view products
@@ -3962,10 +3979,10 @@ function updateProductDropdown() {
                         <div class="product-item-header">
                             <div class="product-item-name">${product.name}</div>
                             <div>
-                                ${currentSession.role === 'owner' || currentSession.role === 'admin' ? 
-                                    `<button class="action-btn edit-btn" onclick="editProduct(${product.id})">✏️ Edit</button>` : ''}
-                                ${currentSession.role === 'owner' ? 
-                                    `<button class="action-btn delete-btn" onclick="deleteProduct(${product.id})">🗑️ Delete</button>` : ''}
+                                ${currentSession.role === 'owner' || currentSession.role === 'admin' ?
+                                    `<button class="action-btn edit-btn" onclick="editProduct('${product.id}')">✏️ Edit</button>` : ''}
+                                ${currentSession.role === 'owner' ?
+                                    `<button class="action-btn delete-btn" onclick="deleteProduct('${product.id}')">🗑️ Delete</button>` : ''}
                             </div>
                         </div>
                         <div class="product-item-details">
@@ -4294,7 +4311,7 @@ function deleteSale(saleId) {
                 return;
             }
             
-            const product = products.find(p => p.id === productId);
+            const product = products.find(p => String(p.id) === String(productId));
             if (!product) return;
             
             // Pre-fill the form
@@ -4332,7 +4349,7 @@ function deleteSale(saleId) {
         function saveProductEdit(event) {
             event.preventDefault();
             
-            const productId = parseInt(document.getElementById('editProductId').value);
+            const productId = document.getElementById('editProductId').value;
             const name = document.getElementById('editProductName').value.trim();
             const buyPrice = parseFloat(document.getElementById('editProductBuyPrice').value);
             const sellPrice = parseFloat(document.getElementById('editProductSellPrice').value);
@@ -5384,7 +5401,7 @@ return `
                         <div class="payout-amount">💰 ₱${commission.toFixed(2)}</div>
                         <span class="payout-status ${payout.status}">${payout.status}</span>
                         ${payout.status === 'pending' ? `
-                            <button class="action-btn edit-btn" onclick="openMarkPaidModal(${payout.id}, ${user.id}, ${commission})">
+                            <button class="action-btn edit-btn" onclick="openMarkPaidModal('${payout.id}', ${user.id}, ${commission})">
                                 ✅ Mark as Paid
                             </button>
                         ` : ''}
