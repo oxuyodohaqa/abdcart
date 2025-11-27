@@ -11,40 +11,45 @@ const config = JSON.parse(readFileSync('./config.json', 'utf-8'));
 
 // Extended proxy list with more servers/countries
 const proxies = {
-  france: 'http://ffff3162f4aa205c0326__cr.fr:e3f079bb220c14b6@gw.dataimpulse.com:823',
-  germany: 'http://ffff3162f4aa205c0326__cr.tw:e3f079bb220c14b6@gw.dataimpulse.com:823',
-  korea: 'http://ffff3162f4aa205c0326__cr.kr,de,fr:e3f079bb220c14b6@gw.dataimpulse.com:823',
-  croatia: 'http://ffff3162f4aa205c0326__cr.hr:e3f079bb220c14b6@gw.dataimpulse.com:823',
-  switzerland: 'http://ffff3162f4aa205c0326__cr.ch:e3f079bb220c14b6@gw.dataimpulse.com:823',
-  singapore: 'http://ffff3162f4aa205c0326__cr.sg:e3f079bb220c14b6@gw.dataimpulse.com:823',
-  usa: 'http://ffff3162f4aa205c0326__cr.us:e3f079bb220c14b6@gw.dataimpulse.com:823',
-  canada: 'http://ffff3162f4aa205c0326__cr.ca:e3f079bb220c14b6@gw.dataimpulse.com:823',
-  brazil: 'http://ffff3162f4aa205c0326__cr.br:e3f079bb220c14b6@gw.dataimpulse.com:823',
+  fr: 'http://ffff3162f4aa205c0326__cr.fr:e3f079bb220c14b6@gw.dataimpulse.com:823',
+  de: 'http://ffff3162f4aa205c0326__cr.de:e3f079bb220c14b6@gw.dataimpulse.com:823',
+  kr: 'http://ffff3162f4aa205c0326__cr.kr,de,fr:e3f079bb220c14b6@gw.dataimpulse.com:823',
+  hr: 'http://ffff3162f4aa205c0326__cr.hr:e3f079bb220c14b6@gw.dataimpulse.com:823',
+  ch: 'http://ffff3162f4aa205c0326__cr.ch:e3f079bb220c14b6@gw.dataimpulse.com:823',
+  sg: 'http://ffff3162f4aa205c0326__cr.sg:e3f079bb220c14b6@gw.dataimpulse.com:823',
+  us: 'http://ffff3162f4aa205c0326__cr.us:e3f079bb220c14b6@gw.dataimpulse.com:823',
+  ca: 'http://ffff3162f4aa205c0326__cr.ca:e3f079bb220c14b6@gw.dataimpulse.com:823',
+  br: 'http://ffff3162f4aa205c0326__cr.br:e3f079bb220c14b6@gw.dataimpulse.com:823',
   th: 'http://ffff3162f4aa205c0326__cr.th:e3f079bb220c14b6@gw.dataimpulse.com:823',
-  india: 'http://ffff3162f4aa205c0326__cr.in:e3f079bb220c14b6@gw.dataimpulse.com:823',
-  japan: 'http://ffff3162f4aa205c0326__cr.jp:e3f079bb220c14b6@gw.dataimpulse.com:823',
-  australia: 'http://ffff3162f4aa205c0326__cr.au:e3f079bb220c14b6@gw.dataimpulse.com:823',
-  italy: 'http://ffff3162f4aa205c0326__cr.it:e3f079bb220c14b6@gw.dataimpulse.com:823',
-  spain: 'http://ffff3162f4aa205c0326__cr.es:e3f079bb220c14b6@gw.dataimpulse.com:823'
+  id: 'http://ffff3162f4aa205c0326__cr.id:e3f079bb220c14b6@gw.dataimpulse.com:823',
+  jp: 'http://ffff3162f4aa205c0326__cr.jp:e3f079bb220c14b6@gw.dataimpulse.com:823',
+  au: 'http://ffff3162f4aa205c0326__cr.au:e3f079bb220c14b6@gw.dataimpulse.com:823',
+  it: 'http://ffff3162f4aa205c0326__cr.it:e3f079bb220c14b6@gw.dataimpulse.com:823',
+  es: 'http://ffff3162f4aa205c0326__cr.es:e3f079bb220c14b6@gw.dataimpulse.com:823'
 };
 
 const countryNames = {
-  france: 'France',
-  germany: 'Germany',
-  korea: 'South Korea',
-  croatia: 'Croatia',
-  switzerland: 'Switzerland',
-  singapore: 'Singapore',
-  usa: 'USA',
-  canada: 'Canada',
-  brazil: 'Brazil',
-  thailand: 'Thailand',
-  india: 'India',
-  japan: 'Japan',
-  australia: 'Australia',
-  italy: 'Italy',
-  spain: 'Spain'
+  fr: 'France',
+  de: 'Germany',
+  kr: 'South Korea',
+  hr: 'Croatia',
+  ch: 'Switzerland',
+  sg: 'Singapore',
+  us: 'USA',
+  ca: 'Canada',
+  br: 'Brazil',
+  th: 'Thailand',
+  id: 'Indonesia',
+  jp: 'Japan',
+  au: 'Australia',
+  it: 'Italy',
+  es: 'Spain'
 };
+
+const DEFAULT_CONCURRENCY = 10;
+const DEFAULT_BATCH_SIZE = 50;
+let MAX_CONCURRENT_REQUESTS = Number(config.maxConcurrent) > 0 ? Number(config.maxConcurrent) : DEFAULT_CONCURRENCY;
+let BATCH_SIZE = Number(config.batchSize) > 0 ? Number(config.batchSize) : DEFAULT_BATCH_SIZE;
 
 function fetchWithProxy(url, options = {}, proxyUrl) {
   if (proxyUrl) {
@@ -271,6 +276,83 @@ async function saveToFile(filename, data) {
   }
 }
 
+async function createAccount({
+  index,
+  total,
+  availableDomains,
+  selectedProxy,
+  password
+}) {
+  try {
+    console.log(chalk.cyan.bold(`${getCurrentTime()} [Attempt ${index}]`));
+    console.log(chalk.blue(`${getCurrentTime()} Generating random email...`));
+
+    const domain = availableDomains[Math.floor(Math.random() * availableDomains.length)];
+    const name = faker.internet.username().toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8);
+    const email = `${name}@${domain}`;
+    console.log(chalk.green.bold(`${getCurrentTime()} Email:`), chalk.white(email));
+
+    const encryptedHexEmail = encryptToTargetHex(email);
+    const encryptedHexPassword = encryptToTargetHex(password);
+
+    console.log(chalk.blue(`${getCurrentTime()} Sending registration request...`));
+    const reqnya = await regist_sendRequest(encryptedHexEmail, encryptedHexPassword, selectedProxy);
+
+    if (!(reqnya && reqnya.message === "success")) {
+      console.log(chalk.red(`${getCurrentTime()} ❌ Registration failed for ${domain}`));
+      if (reqnya && reqnya.error) {
+        console.log(chalk.red(`${getCurrentTime()} Error: ${reqnya.error}`));
+      }
+      return false;
+    }
+
+    console.log(chalk.blue(`${getCurrentTime()} Waiting for verification email...`));
+
+    let verificationCode;
+    let attempts = 0;
+    const maxAttempts = 12;
+
+    do {
+      verificationCode = await functionGetLink(email.split('@')[0], email.split('@')[1], selectedProxy);
+      if (!verificationCode) {
+        attempts++;
+        console.log(chalk.yellow(`${getCurrentTime()} Attempt ${attempts}/${maxAttempts} - No code yet, waiting...`));
+        await new Promise(resolve => setTimeout(resolve, 6000));
+      }
+    } while (!verificationCode && attempts < maxAttempts);
+
+    if (!verificationCode) {
+      console.log(chalk.red(`${getCurrentTime()} Failed to get verification code after ${maxAttempts} attempts`));
+      return false;
+    }
+
+    console.log(chalk.green(`${getCurrentTime()} Verification code received: ${verificationCode}`));
+
+    console.log(chalk.blue(`${getCurrentTime()} Verifying account...`));
+    const verifyResult = await verify_sendRequest(encryptToTargetHex(email), encryptedHexPassword, encryptToTargetHex(verificationCode), selectedProxy);
+
+    if (verifyResult && verifyResult.message === "success") {
+      const walletData = `${email}:${password}\n`;
+      await saveToFile(`accounts.txt`, walletData);
+      console.log(chalk.green.bold(`${getCurrentTime()} ✅ Account created successfully! (${index}/${total})`));
+      console.log(chalk.green(`╔══════════════════════════════════╗`));
+      console.log(chalk.green(`║ Email:    ${email.padEnd(25)} ║`));
+      console.log(chalk.green(`║ Password: ${password.padEnd(25)} ║`));
+      console.log(chalk.green(`╚══════════════════════════════════╝\n`));
+      return true;
+    }
+
+    console.log(chalk.red(`${getCurrentTime()} ❌ Verification failed`));
+    if (verifyResult && verifyResult.error) {
+      console.log(chalk.red(`${getCurrentTime()} Error: ${verifyResult.error}`));
+    }
+    return false;
+  } catch (error) {
+    console.log(chalk.red(`${getCurrentTime()} ❌ Error in attempt ${index}:`), error.message);
+    return false;
+  }
+}
+
 function getCurrentTime() {
   const now = new Date();
   const hours = String(now.getHours()).padStart(2, '0');
@@ -283,20 +365,20 @@ function displayCountryMenu() {
   console.log(chalk.yellow.bold('║        SELECT COUNTRY          ║'));
   console.log(chalk.yellow.bold('╠══════════════════════════════════╣'));
   console.log(chalk.cyan('║ [1] France               (fr)    ║'));
-  console.log(chalk.cyan('║ [2] Germany             (de)     ║'));
-  console.log(chalk.cyan('║ [3] South Korea         (kr)     ║'));
-  console.log(chalk.cyan('║ [4] Croatia             (hr)     ║'));
-  console.log(chalk.cyan('║ [5] Switzerland         (ch)     ║'));
-  console.log(chalk.cyan('║ [6] Singapore           (sg)     ║'));
-  console.log(chalk.cyan('║ [7] USA                 (us)     ║'));
-  console.log(chalk.cyan('║ [8] Canada              (ca)     ║'));
-  console.log(chalk.cyan('║ [9] Brazil              (br)     ║'));
-  console.log(chalk.cyan('║ [10] Thailand           (th)     ║'));
-  console.log(chalk.cyan('║ [11] India              (in)     ║'));
-  console.log(chalk.cyan('║ [12] Japan              (jp)     ║'));
-  console.log(chalk.cyan('║ [13] Australia          (au)     ║'));
-  console.log(chalk.cyan('║ [14] Italy              (it)     ║'));
-  console.log(chalk.cyan('║ [15] Spain              (es)     ║'));
+  console.log(chalk.cyan('║ [2] Germany              (de)    ║'));
+  console.log(chalk.cyan('║ [3] South Korea          (kr)    ║'));
+  console.log(chalk.cyan('║ [4] Croatia              (hr)    ║'));
+  console.log(chalk.cyan('║ [5] Switzerland          (ch)    ║'));
+  console.log(chalk.cyan('║ [6] Singapore            (sg)    ║'));
+  console.log(chalk.cyan('║ [7] USA                  (us)    ║'));
+  console.log(chalk.cyan('║ [8] Canada               (ca)    ║'));
+  console.log(chalk.cyan('║ [9] Brazil               (br)    ║'));
+  console.log(chalk.cyan('║ [10] Thailand            (th)    ║'));
+  console.log(chalk.cyan('║ [11] Indonesia           (id)    ║'));
+  console.log(chalk.cyan('║ [12] Japan               (jp)    ║'));
+  console.log(chalk.cyan('║ [13] Australia           (au)    ║'));
+  console.log(chalk.cyan('║ [14] Italy               (it)    ║'));
+  console.log(chalk.cyan('║ [15] Spain               (es)    ║'));
   console.log(chalk.yellow.bold('╚══════════════════════════════════╝\n'));
 }
 
@@ -311,48 +393,52 @@ async function promptUser() {
 
     readline.question('How many accounts to create? ', (count) => {
       readline.question('Enter country choice (number or code): ', (countryInput) => {
-        readline.close();
-        
-        let country;
-        const cleanInput = countryInput.trim().toLowerCase();
-        
-        // Map input to country code
-        if (['1', 'fr', 'france'].includes(cleanInput)) {
-          country = 'france';
-        } else if (['2', 'de', 'germany'].includes(cleanInput)) {
-          country = 'germany';
-        } else if (['3', 'kr', 'korea', 'south korea'].includes(cleanInput)) {
-          country = 'korea';
-        } else if (['4', 'hr', 'croatia'].includes(cleanInput)) {
-          country = 'croatia';
-        } else if (['5', 'ch', 'switzerland'].includes(cleanInput)) {
-          country = 'switzerland';
-        } else if (['6', 'sg', 'singapore'].includes(cleanInput)) {
-          country = 'singapore';
-        } else if (['7', 'us', 'usa', 'united states'].includes(cleanInput)) {
-          country = 'usa';
-        } else if (['8', 'ca', 'canada'].includes(cleanInput)) {
-          country = 'canada';
-        } else if (['9', 'br', 'brazil'].includes(cleanInput)) {
-          country = 'brazil';
-        } else if (['10', 'th', 'thai', 'thailand'].includes(cleanInput)) {
-          country = 'th';
-        } else if (['11', 'in', 'india'].includes(cleanInput)) {
-          country = 'india';
-        } else if (['12', 'jp', 'japan'].includes(cleanInput)) {
-          country = 'japan';
-        } else if (['13', 'au', 'australia'].includes(cleanInput)) {
-          country = 'australia';
-        } else if (['14', 'it', 'italy'].includes(cleanInput)) {
-          country = 'italy';
-        } else if (['15', 'es', 'spain'].includes(cleanInput)) {
-          country = 'spain';
-        } else {
-          console.log(chalk.red(`Invalid country choice "${countryInput}". Defaulting to France.`));
-          country = 'france';
-        }
-        
-        resolve({ count, country });
+        readline.question(`Max concurrent attempts? (press Enter for ${MAX_CONCURRENT_REQUESTS}): `, (concurrencyInput) => {
+          readline.question(`Batch size? (press Enter for ${BATCH_SIZE}): `, (batchInput) => {
+            readline.close();
+
+            let country;
+            const cleanInput = countryInput.trim().toLowerCase();
+
+            // Map input to country code
+            if (['1', 'fr', 'france'].includes(cleanInput)) {
+              country = 'fr';
+            } else if (['2', 'de', 'germany'].includes(cleanInput)) {
+              country = 'de';
+            } else if (['3', 'kr', 'korea', 'south korea'].includes(cleanInput)) {
+              country = 'kr';
+            } else if (['4', 'hr', 'croatia'].includes(cleanInput)) {
+              country = 'hr';
+            } else if (['5', 'ch', 'switzerland'].includes(cleanInput)) {
+              country = 'ch';
+            } else if (['6', 'sg', 'singapore'].includes(cleanInput)) {
+              country = 'sg';
+            } else if (['7', 'us', 'usa', 'united states'].includes(cleanInput)) {
+              country = 'us';
+            } else if (['8', 'ca', 'canada'].includes(cleanInput)) {
+              country = 'ca';
+            } else if (['9', 'br', 'brazil'].includes(cleanInput)) {
+              country = 'br';
+            } else if (['10', 'th', 'thai', 'thailand'].includes(cleanInput)) {
+              country = 'th';
+            } else if (['11', 'id', 'indo', 'indonesia'].includes(cleanInput)) {
+              country = 'id';
+            } else if (['12', 'jp', 'japan'].includes(cleanInput)) {
+              country = 'jp';
+            } else if (['13', 'au', 'australia'].includes(cleanInput)) {
+              country = 'au';
+            } else if (['14', 'it', 'italy'].includes(cleanInput)) {
+              country = 'it';
+            } else if (['15', 'es', 'spain'].includes(cleanInput)) {
+              country = 'es';
+            } else {
+              console.log(chalk.red(`Invalid country choice "${countryInput}". Defaulting to France.`));
+              country = 'fr';
+            }
+
+            resolve({ count, country, concurrencyInput, batchInput });
+          });
+        });
       });
     });
   });
@@ -360,7 +446,7 @@ async function promptUser() {
 
 (async () => {
   try {
-    const { count, country } = await promptUser();
+    const { count, country, concurrencyInput, batchInput } = await promptUser();
 
     let loopCount = parseInt(count);
     if (isNaN(loopCount) || loopCount <= 0) {
@@ -371,8 +457,19 @@ async function promptUser() {
     const selectedProxy = proxies[country];
     const countryName = countryNames[country];
 
+    const parsedConcurrency = parseInt(concurrencyInput, 10);
+    if (!isNaN(parsedConcurrency) && parsedConcurrency > 0) {
+      MAX_CONCURRENT_REQUESTS = parsedConcurrency;
+    }
+
+    const parsedBatch = parseInt(batchInput, 10);
+    if (!isNaN(parsedBatch) && parsedBatch > 0) {
+      BATCH_SIZE = parsedBatch;
+    }
+
     console.log(chalk.green.bold(`\n${getCurrentTime()} Starting with ${countryName} proxy`));
     console.log(chalk.green(`${getCurrentTime()} Creating ${loopCount} account(s)`));
+    console.log(chalk.green(`${getCurrentTime()} Concurrency set to ${MAX_CONCURRENT_REQUESTS}, batch size set to ${BATCH_SIZE}`));
     const availableDomains = await getEmailRandom(selectedProxy);
     if (!availableDomains || availableDomains.length === 0) {
       console.log(chalk.red(`${getCurrentTime()} No domains available for signup.`));
@@ -381,83 +478,70 @@ async function promptUser() {
 
     console.log(chalk.magenta(`${getCurrentTime()} Using domains: ${availableDomains.join(', ')}\n`));
 
-    const promises = [];
+    const password = config.password;
+    let successCount = 0;
+    let attemptNumber = 0;
 
-    for (let i = 1; i <= loopCount; i++) {
-      promises.push((async () => {
-        try {
-          console.log(chalk.cyan.bold(`${getCurrentTime()} [Account ${i}/${loopCount}]`));
-          console.log(chalk.blue(`${getCurrentTime()} Generating random email...`));
+    const runBatch = async (batchGoal) => {
+      let batchSuccess = 0;
+      const activePromises = new Set();
 
-          const domain = availableDomains[Math.floor(Math.random() * availableDomains.length)];
-          const name = faker.internet.username().toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8);
-          const email = `${name}@${domain}`;
-          console.log(chalk.green.bold(`${getCurrentTime()} Email:`), chalk.white(email));
-          
-          const password = config.password;
-          const encryptedHexEmail = encryptToTargetHex(email);
-          const encryptedHexPassword = encryptToTargetHex(password);
-
-          console.log(chalk.blue(`${getCurrentTime()} Sending registration request...`));
-          const reqnya = await regist_sendRequest(encryptedHexEmail, encryptedHexPassword, selectedProxy);
-
-          if (reqnya && reqnya.message === "success") {
-            console.log(chalk.blue(`${getCurrentTime()} Waiting for verification email...`));
-
-            let verificationCode;
-            let attempts = 0;
-            const maxAttempts = 12;
-            
-            do {
-              verificationCode = await functionGetLink(email.split('@')[0], email.split('@')[1], selectedProxy);
-              if (!verificationCode) {
-                attempts++;
-                console.log(chalk.yellow(`${getCurrentTime()} Attempt ${attempts}/${maxAttempts} - No code yet, waiting...`));
-                await new Promise(resolve => setTimeout(resolve, 6000));
-              }
-            } while (!verificationCode && attempts < maxAttempts);
-
-            if (!verificationCode) {
-              console.log(chalk.red(`${getCurrentTime()} Failed to get verification code after ${maxAttempts} attempts`));
-              return;
+      const queueNext = () => {
+        while (activePromises.size < MAX_CONCURRENT_REQUESTS && batchSuccess < batchGoal && successCount < loopCount) {
+          attemptNumber++;
+          const promise = createAccount({
+            index: attemptNumber,
+            total: loopCount,
+            availableDomains,
+            selectedProxy,
+            password
+          }).then((success) => {
+            if (success) {
+              batchSuccess++;
+              successCount++;
             }
+          }).finally(() => {
+            activePromises.delete(promise);
+          });
 
-            console.log(chalk.green(`${getCurrentTime()} Verification code received: ${verificationCode}`));
-
-            // Verify the account
-            console.log(chalk.blue(`${getCurrentTime()} Verifying account...`));
-            const verifyResult = await verify_sendRequest(encryptedHexEmail, encryptedHexPassword, encryptToTargetHex(verificationCode), selectedProxy);
-            
-            if (verifyResult && verifyResult.message === "success") {
-              // Only save email:password, as per your request
-              const walletData = `${email}:${password}\n`;
-              await saveToFile(`accounts.txt`, walletData);
-              console.log(chalk.green.bold(`${getCurrentTime()} ✅ Account created successfully!`));
-              console.log(chalk.green(`╔══════════════════════════════════╗`));
-              console.log(chalk.green(`║ Email:    ${email.padEnd(25)} ║`));
-              console.log(chalk.green(`║ Password: ${password.padEnd(25)} ║`));
-              console.log(chalk.green(`╚══════════════════════════════════╝\n`));
-            } else {
-              console.log(chalk.red(`${getCurrentTime()} ❌ Verification failed`));
-              if (verifyResult && verifyResult.error) {
-                console.log(chalk.red(`${getCurrentTime()} Error: ${verifyResult.error}`));
-              }
-            }
-          } else {
-            console.log(chalk.red(`${getCurrentTime()} ❌ Registration failed for ${domain}`));
-            if (reqnya && reqnya.error) {
-              console.log(chalk.red(`${getCurrentTime()} Error: ${reqnya.error}`));
-            }
-          }
-        } catch (error) {
-          console.log(chalk.red(`${getCurrentTime()} ❌ Error in iteration ${i}:`), error.message);
+          activePromises.add(promise);
         }
-      })());
+      };
+
+      queueNext();
+
+      while (batchSuccess < batchGoal && successCount < loopCount) {
+        if (activePromises.size === 0) {
+          queueNext();
+        }
+
+        if (activePromises.size === 0) {
+          break;
+        }
+
+        await Promise.race(activePromises);
+        queueNext();
+      }
+
+      await Promise.all(activePromises);
+
+      console.log(chalk.magenta(`${getCurrentTime()} Batch completed: ${batchSuccess} successful (total ${successCount}/${loopCount})`));
+    };
+
+    while (successCount < loopCount) {
+      const remaining = loopCount - successCount;
+      const batchGoal = Math.min(BATCH_SIZE, remaining);
+      console.log(chalk.magenta(`${getCurrentTime()} Starting batch for up to ${batchGoal} account(s)`));
+      await runBatch(batchGoal);
     }
 
-    await Promise.all(promises);
     console.log(chalk.green.bold(`\n${getCurrentTime()} 🎉 All operations completed!`));
-    console.log(chalk.cyan(`${getCurrentTime()} Check accounts.txt for successful registrations.`));
+    console.log(chalk.cyan(`${getCurrentTime()} Successful registrations: ${successCount}/${loopCount}`));
+    if (successCount < loopCount) {
+      console.log(chalk.yellow(`${getCurrentTime()} Some attempts failed; adjust proxy/domains or retry for more accounts.`));
+    } else {
+      console.log(chalk.green(`${getCurrentTime()} Requested account total reached.`));
+    }
   } catch (error) {
     console.log(chalk.red(`${getCurrentTime()} Fatal error:`), error.message);
   }
