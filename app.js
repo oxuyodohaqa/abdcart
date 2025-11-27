@@ -47,7 +47,9 @@ const countryNames = {
 };
 
 const DEFAULT_CONCURRENCY = 10;
-const MAX_CONCURRENT_REQUESTS = Number(config.maxConcurrent) > 0 ? Number(config.maxConcurrent) : DEFAULT_CONCURRENCY;
+const DEFAULT_BATCH_SIZE = 50;
+let MAX_CONCURRENT_REQUESTS = Number(config.maxConcurrent) > 0 ? Number(config.maxConcurrent) : DEFAULT_CONCURRENCY;
+let BATCH_SIZE = Number(config.batchSize) > 0 ? Number(config.batchSize) : DEFAULT_BATCH_SIZE;
 
 function fetchWithProxy(url, options = {}, proxyUrl) {
   if (proxyUrl) {
@@ -391,48 +393,52 @@ async function promptUser() {
 
     readline.question('How many accounts to create? ', (count) => {
       readline.question('Enter country choice (number or code): ', (countryInput) => {
-        readline.close();
-        
-        let country;
-        const cleanInput = countryInput.trim().toLowerCase();
-        
-        // Map input to country code
-        if (['1', 'fr', 'france'].includes(cleanInput)) {
-          country = 'fr';
-        } else if (['2', 'de', 'germany'].includes(cleanInput)) {
-          country = 'de';
-        } else if (['3', 'kr', 'korea', 'south korea'].includes(cleanInput)) {
-          country = 'kr';
-        } else if (['4', 'hr', 'croatia'].includes(cleanInput)) {
-          country = 'hr';
-        } else if (['5', 'ch', 'switzerland'].includes(cleanInput)) {
-          country = 'ch';
-        } else if (['6', 'sg', 'singapore'].includes(cleanInput)) {
-          country = 'sg';
-        } else if (['7', 'us', 'usa', 'united states'].includes(cleanInput)) {
-          country = 'us';
-        } else if (['8', 'ca', 'canada'].includes(cleanInput)) {
-          country = 'ca';
-        } else if (['9', 'br', 'brazil'].includes(cleanInput)) {
-          country = 'br';
-        } else if (['10', 'th', 'thai', 'thailand'].includes(cleanInput)) {
-          country = 'th';
-        } else if (['11', 'id', 'indo', 'indonesia'].includes(cleanInput)) {
-          country = 'id';
-        } else if (['12', 'jp', 'japan'].includes(cleanInput)) {
-          country = 'jp';
-        } else if (['13', 'au', 'australia'].includes(cleanInput)) {
-          country = 'au';
-        } else if (['14', 'it', 'italy'].includes(cleanInput)) {
-          country = 'it';
-        } else if (['15', 'es', 'spain'].includes(cleanInput)) {
-          country = 'es';
-        } else {
-          console.log(chalk.red(`Invalid country choice "${countryInput}". Defaulting to France.`));
-          country = 'fr';
-        }
-        
-        resolve({ count, country });
+        readline.question(`Max concurrent attempts? (press Enter for ${MAX_CONCURRENT_REQUESTS}): `, (concurrencyInput) => {
+          readline.question(`Batch size? (press Enter for ${BATCH_SIZE}): `, (batchInput) => {
+            readline.close();
+
+            let country;
+            const cleanInput = countryInput.trim().toLowerCase();
+
+            // Map input to country code
+            if (['1', 'fr', 'france'].includes(cleanInput)) {
+              country = 'fr';
+            } else if (['2', 'de', 'germany'].includes(cleanInput)) {
+              country = 'de';
+            } else if (['3', 'kr', 'korea', 'south korea'].includes(cleanInput)) {
+              country = 'kr';
+            } else if (['4', 'hr', 'croatia'].includes(cleanInput)) {
+              country = 'hr';
+            } else if (['5', 'ch', 'switzerland'].includes(cleanInput)) {
+              country = 'ch';
+            } else if (['6', 'sg', 'singapore'].includes(cleanInput)) {
+              country = 'sg';
+            } else if (['7', 'us', 'usa', 'united states'].includes(cleanInput)) {
+              country = 'us';
+            } else if (['8', 'ca', 'canada'].includes(cleanInput)) {
+              country = 'ca';
+            } else if (['9', 'br', 'brazil'].includes(cleanInput)) {
+              country = 'br';
+            } else if (['10', 'th', 'thai', 'thailand'].includes(cleanInput)) {
+              country = 'th';
+            } else if (['11', 'id', 'indo', 'indonesia'].includes(cleanInput)) {
+              country = 'id';
+            } else if (['12', 'jp', 'japan'].includes(cleanInput)) {
+              country = 'jp';
+            } else if (['13', 'au', 'australia'].includes(cleanInput)) {
+              country = 'au';
+            } else if (['14', 'it', 'italy'].includes(cleanInput)) {
+              country = 'it';
+            } else if (['15', 'es', 'spain'].includes(cleanInput)) {
+              country = 'es';
+            } else {
+              console.log(chalk.red(`Invalid country choice "${countryInput}". Defaulting to France.`));
+              country = 'fr';
+            }
+
+            resolve({ count, country, concurrencyInput, batchInput });
+          });
+        });
       });
     });
   });
@@ -440,7 +446,7 @@ async function promptUser() {
 
 (async () => {
   try {
-    const { count, country } = await promptUser();
+    const { count, country, concurrencyInput, batchInput } = await promptUser();
 
     let loopCount = parseInt(count);
     if (isNaN(loopCount) || loopCount <= 0) {
@@ -451,8 +457,19 @@ async function promptUser() {
     const selectedProxy = proxies[country];
     const countryName = countryNames[country];
 
+    const parsedConcurrency = parseInt(concurrencyInput, 10);
+    if (!isNaN(parsedConcurrency) && parsedConcurrency > 0) {
+      MAX_CONCURRENT_REQUESTS = parsedConcurrency;
+    }
+
+    const parsedBatch = parseInt(batchInput, 10);
+    if (!isNaN(parsedBatch) && parsedBatch > 0) {
+      BATCH_SIZE = parsedBatch;
+    }
+
     console.log(chalk.green.bold(`\n${getCurrentTime()} Starting with ${countryName} proxy`));
     console.log(chalk.green(`${getCurrentTime()} Creating ${loopCount} account(s)`));
+    console.log(chalk.green(`${getCurrentTime()} Concurrency set to ${MAX_CONCURRENT_REQUESTS}, batch size set to ${BATCH_SIZE}`));
     const availableDomains = await getEmailRandom(selectedProxy);
     if (!availableDomains || availableDomains.length === 0) {
       console.log(chalk.red(`${getCurrentTime()} No domains available for signup.`));
@@ -464,45 +481,59 @@ async function promptUser() {
     const password = config.password;
     let successCount = 0;
     let attemptNumber = 0;
-    const activePromises = new Set();
 
-    const queueNext = () => {
-      while (activePromises.size < MAX_CONCURRENT_REQUESTS && successCount < loopCount) {
-        attemptNumber++;
-        const promise = createAccount({
-          index: attemptNumber,
-          total: loopCount,
-          availableDomains,
-          selectedProxy,
-          password
-        }).then((success) => {
-          if (success) {
-            successCount++;
-          }
-        }).finally(() => {
-          activePromises.delete(promise);
-        });
+    const runBatch = async (batchGoal) => {
+      let batchSuccess = 0;
+      const activePromises = new Set();
 
-        activePromises.add(promise);
-      }
-    };
+      const queueNext = () => {
+        while (activePromises.size < MAX_CONCURRENT_REQUESTS && batchSuccess < batchGoal && successCount < loopCount) {
+          attemptNumber++;
+          const promise = createAccount({
+            index: attemptNumber,
+            total: loopCount,
+            availableDomains,
+            selectedProxy,
+            password
+          }).then((success) => {
+            if (success) {
+              batchSuccess++;
+              successCount++;
+            }
+          }).finally(() => {
+            activePromises.delete(promise);
+          });
 
-    queueNext();
+          activePromises.add(promise);
+        }
+      };
 
-    while (successCount < loopCount) {
-      if (activePromises.size === 0) {
+      queueNext();
+
+      while (batchSuccess < batchGoal && successCount < loopCount) {
+        if (activePromises.size === 0) {
+          queueNext();
+        }
+
+        if (activePromises.size === 0) {
+          break;
+        }
+
+        await Promise.race(activePromises);
         queueNext();
       }
 
-      if (activePromises.size === 0) {
-        break;
-      }
+      await Promise.all(activePromises);
 
-      await Promise.race(activePromises);
-      queueNext();
+      console.log(chalk.magenta(`${getCurrentTime()} Batch completed: ${batchSuccess} successful (total ${successCount}/${loopCount})`));
+    };
+
+    while (successCount < loopCount) {
+      const remaining = loopCount - successCount;
+      const batchGoal = Math.min(BATCH_SIZE, remaining);
+      console.log(chalk.magenta(`${getCurrentTime()} Starting batch for up to ${batchGoal} account(s)`));
+      await runBatch(batchGoal);
     }
-
-    await Promise.all(activePromises);
 
     console.log(chalk.green.bold(`\n${getCurrentTime()} 🎉 All operations completed!`));
     console.log(chalk.cyan(`${getCurrentTime()} Successful registrations: ${successCount}/${loopCount}`));
