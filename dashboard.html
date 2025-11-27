@@ -844,8 +844,9 @@
             cursor: pointer;
             font-size: 0.88em;
             font-weight: 700;
-            transition: var(--transition);
+            transition: transform 0.12s ease, background-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
             margin-right: 8px;
+            touch-action: manipulation;
         }
 
         .edit-btn {
@@ -1313,6 +1314,31 @@ body.dark-mode .profile-select-btn {
             font-size: 0.9em;
             color: var(--text-color);
             opacity: 0.8;
+        }
+
+        .user-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .user-metric {
+            background: var(--card-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 10px 12px;
+        }
+
+        .user-metric .label {
+            font-size: 0.8em;
+            opacity: 0.7;
+        }
+
+        .user-metric .value {
+            font-weight: 800;
+            color: var(--primary);
+            margin-top: 4px;
         }
 
         .user-item-actions {
@@ -2992,6 +3018,52 @@ body.dark-mode .profile-select-btn {
         </div>
     </div>
 
+    <!-- Edit Subscription Product Modal -->
+    <div class="modal" id="editSubscriptionModal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>✏️ Edit Subscription Product</h2>
+                <button class="close-btn" onclick="closeEditSubscriptionModal()">✕</button>
+            </div>
+
+            <form id="editSubscriptionForm" onsubmit="saveSubscriptionEdit(event)">
+                <input type="hidden" id="editSubProductId">
+
+                <div class="form-group">
+                    <label>📦 Product Name</label>
+                    <input type="text" id="editSubProductName" required>
+                </div>
+
+                <div class="form-group">
+                    <label>🛒 Buy Price (Your Cost)</label>
+                    <input type="number" id="editSubBuyPrice" step="0.01" min="0" required>
+                </div>
+
+                <div class="form-group">
+                    <label>💰 Full Account Sell Price</label>
+                    <input type="number" id="editSubFullPrice" step="0.01" min="0" required>
+                </div>
+
+                <div class="form-group">
+                    <label>👤 Solo Profile Price</label>
+                    <input type="number" id="editSubSoloPrice" step="0.01" min="0" required>
+                </div>
+
+                <div class="form-group">
+                    <label>👥 Shared Full Account Price</label>
+                    <input type="number" id="editSubSharedPrice" step="0.01" min="0" required>
+                </div>
+
+                <div class="form-group">
+                    <label>🔢 Total Profiles</label>
+                    <input type="number" id="editSubTotalProfiles" min="1" max="20" required readonly>
+                </div>
+
+                <button type="submit" class="btn btn-success">✅ Save Changes</button>
+            </form>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div class="toast" id="toast">
         <span class="toast-icon" id="toastIcon">✓</span>
@@ -3330,21 +3402,25 @@ function renderSubscriptionProducts() {
         return;
     }
     
-    container.innerHTML = subscriptionProducts.map(product => {
-        const availableCount = product.profiles.filter(p => !p.sold).length;
+        container.innerHTML = subscriptionProducts.map(product => {
+            const availableCount = product.profiles.filter(p => !p.sold).length;
+            const soloPrice = product.profilePrice || product.soloPrice || 0;
+            const sharedPrice = product.sharedPrice || product.fullPrice || 0;
         
         return `
             <div class="subscription-product-item">
                 <div class="subscription-header">
                     <div class="subscription-title">🎬 ${product.name}</div>
                     <div>
+                        <button class="action-btn edit-btn" onclick="editSubscriptionProduct(${product.id})">✏️</button>
                         <button class="action-btn delete-btn" onclick="deleteSubscriptionProduct(${product.id})">🗑️</button>
                     </div>
                 </div>
-                
+
                 <div class="subscription-pricing">
                     <div class="price-tag">💰 Full: ₱${product.fullPrice.toFixed(2)}</div>
-                    <div class="price-tag">👤 Profile: ₱${product.profilePrice.toFixed(2)}</div>
+                    <div class="price-tag">👤 Solo: ₱${soloPrice.toFixed(2)}</div>
+                    <div class="price-tag">👥 Shared: ₱${sharedPrice.toFixed(2)}</div>
                     <div class="price-tag">🛒 Cost: ₱${product.buyPrice.toFixed(2)}</div>
                 </div>
                 
@@ -3370,6 +3446,69 @@ function deleteSubscriptionProduct(productId) {
     if (!confirm('Delete this subscription product?')) return;
     getRef('subscriptionProducts/' + productId).remove()
         .then(() => showToast('🗑️ Product deleted', 'info'))
+        .catch((error) => showToast('❌ Error: ' + error.message, 'error'));
+}
+
+function editSubscriptionProduct(productId) {
+    if (currentSession.role !== 'owner') {
+        showToast('❌ Only owner can edit subscription prices', 'error');
+        return;
+    }
+
+    const product = subscriptionProducts.find(p => String(p.id) === String(productId));
+    if (!product) return;
+
+    document.getElementById('editSubProductId').value = product.id;
+    document.getElementById('editSubProductName').value = product.name;
+    document.getElementById('editSubBuyPrice').value = product.buyPrice;
+    document.getElementById('editSubFullPrice').value = product.fullPrice;
+    document.getElementById('editSubSoloPrice').value = product.profilePrice || product.soloPrice || '';
+    document.getElementById('editSubSharedPrice').value = product.sharedPrice || product.fullPrice || '';
+    document.getElementById('editSubTotalProfiles').value = product.totalProfiles;
+
+    document.getElementById('editSubscriptionModal').classList.add('show');
+}
+
+function closeEditSubscriptionModal() {
+    document.getElementById('editSubscriptionModal').classList.remove('show');
+}
+
+function saveSubscriptionEdit(event) {
+    event.preventDefault();
+
+    const productId = document.getElementById('editSubProductId').value;
+    const name = document.getElementById('editSubProductName').value.trim();
+    const buyPrice = parseFloat(document.getElementById('editSubBuyPrice').value);
+    const fullPrice = parseFloat(document.getElementById('editSubFullPrice').value);
+    const soloPrice = parseFloat(document.getElementById('editSubSoloPrice').value);
+    const sharedPrice = parseFloat(document.getElementById('editSubSharedPrice').value);
+
+    if (!name || isNaN(buyPrice) || isNaN(fullPrice) || isNaN(soloPrice) || isNaN(sharedPrice)) {
+        showToast('⚠️ Please fill out all fields with valid numbers', 'error');
+        return;
+    }
+
+    const existingProduct = subscriptionProducts.find(p => String(p.id) === String(productId));
+    if (!existingProduct) return;
+
+    const updatedProduct = {
+        ...existingProduct,
+        name,
+        buyPrice,
+        fullPrice,
+        profilePrice: soloPrice,
+        soloPrice,
+        sharedPrice,
+        updatedAt: new Date().toISOString()
+    };
+
+    showSyncingIndicator();
+    getRef('subscriptionProducts/' + productId).update(updatedProduct)
+        .then(() => {
+            closeEditSubscriptionModal();
+            showToast('✅ Subscription product updated!', 'success');
+            renderSubscriptionProducts();
+        })
         .catch((error) => showToast('❌ Error: ' + error.message, 'error'));
 }
 
@@ -3535,7 +3674,32 @@ function loadAllData() {
     // Load subscription products
     getRef('subscriptionProducts').on('value', (snapshot) => {
         const subProductsData = snapshot.val() || {};
-        subscriptionProducts = Object.values(subProductsData);
+        subscriptionProducts = Object.entries(subProductsData).map(([key, data]) => {
+            const profilesRaw = data.profiles || [];
+            const profiles = Array.isArray(profilesRaw)
+                ? profilesRaw
+                : Object.values(profilesRaw);
+
+            return {
+                id: data.id || key,
+                name: data.name || 'Untitled',
+                buyPrice: Number(data.buyPrice) || 0,
+                fullPrice: Number(data.fullPrice) || 0,
+                profilePrice: data.profilePrice != null ? Number(data.profilePrice) : undefined,
+                soloPrice: data.soloPrice != null ? Number(data.soloPrice) : undefined,
+                sharedPrice: data.sharedPrice != null ? Number(data.sharedPrice) : undefined,
+                totalProfiles: Number(data.totalProfiles) || profiles.length || 0,
+                profiles: profiles.map((profile, index) => ({
+                    number: profile.number ?? index + 1,
+                    sold: !!profile.sold,
+                    soldBy: profile.soldBy || '',
+                    soldDate: profile.soldDate || ''
+                })),
+                createdAt: data.createdAt || '',
+                updatedAt: data.updatedAt || ''
+            };
+        });
+
         console.log('📺 Loaded subscription products:', subscriptionProducts.length);
         renderSubscriptionProducts();
         updateProductDropdown();
@@ -5045,20 +5209,69 @@ function editSale(id) {
             
             userList.innerHTML = adminUsers.map(user => {
                 const userSales = sales.filter(s => s.userId === user.id && s.sold);
-                const totalCommission = userSales.reduce((sum, s) => sum + ((s.commission || 0) * s.quantity), 0);
-                
+                const summary = userSales.reduce((totals, sale) => {
+                    const quantity = parseInt(sale.quantity) || 1;
+                    const price = parseFloat(sale.price) || 0;
+                    const buyPrice = parseFloat(sale.buyPrice) || 0;
+                    const sellPrice = parseFloat(sale.sellPrice) || price;
+                    const actualBuy = buyPrice > 0 ? buyPrice : (sellPrice * 0.7);
+
+                    totals.salesCount += quantity;
+                    totals.totalSales += price * quantity;
+                    totals.totalCapital += actualBuy * quantity;
+                    totals.totalProfit += (sellPrice - actualBuy) * quantity;
+                    totals.totalSalary += (parseFloat(sale.commission) || 0) * quantity;
+                    return totals;
+                }, {
+                    salesCount: 0,
+                    totalSales: 0,
+                    totalCapital: 0,
+                    totalProfit: 0,
+                    totalSalary: 0
+                });
+
+                const avgRate = summary.totalProfit > 0
+                    ? ((summary.totalSalary / summary.totalProfit) * 100).toFixed(1)
+                    : '0.0';
+
                 // Display commission info based on mode
                 const commissionMode = user.commissionMode || 'flatRate'; // Default to flatRate for backwards compatibility
-                const commissionDisplay = commissionMode === 'flatRate' 
-                    ? `Flat Rate: ${user.profitPercent}%` 
+                const commissionDisplay = commissionMode === 'flatRate'
+                    ? `Flat Rate: ${user.profitPercent}%`
                     : 'Bracket-Based';
-                
+
                 return `
                     <div class="user-item">
                         <div class="user-item-info">
                             <div class="user-item-name">${user.customName}</div>
                             <div class="user-item-details">
-                                @${user.username} • ${commissionDisplay} • Total Earnings: ₱${totalCommission.toFixed(2)}
+                                @${user.username} • ${commissionDisplay} • Total Earnings: ₱${summary.totalSalary.toFixed(2)}
+                            </div>
+                            <div class="user-metrics">
+                                <div class="user-metric">
+                                    <div class="label">Total Sales</div>
+                                    <div class="value">₱${summary.totalSales.toFixed(2)}</div>
+                                </div>
+                                <div class="user-metric">
+                                    <div class="label">Total Capital</div>
+                                    <div class="value">₱${summary.totalCapital.toFixed(2)}</div>
+                                </div>
+                                <div class="user-metric">
+                                    <div class="label">Total Profit</div>
+                                    <div class="value">₱${summary.totalProfit.toFixed(2)}</div>
+                                </div>
+                                <div class="user-metric">
+                                    <div class="label">Total Salary</div>
+                                    <div class="value">₱${summary.totalSalary.toFixed(2)}</div>
+                                </div>
+                                <div class="user-metric">
+                                    <div class="label">Items Sold</div>
+                                    <div class="value">${summary.salesCount}</div>
+                                </div>
+                                <div class="user-metric">
+                                    <div class="label">Avg Rate</div>
+                                    <div class="value">${avgRate}%</div>
+                                </div>
                             </div>
                         </div>
                         <div class="user-item-actions">
@@ -5354,7 +5567,7 @@ return `
                 payoutList.innerHTML = '<div class="empty-state"><div class="empty-icon">💰</div><p>No payouts yet</p></div>';
                 return;
             }
-            
+
             // Filter payouts based on current period
             const now = new Date();
             let filteredPayouts = payouts.filter(p => p.status === 'pending');
@@ -5408,7 +5621,7 @@ return `
                     </div>
                 `;
             }).join('');
-            
+
             if (filteredPayouts.length === 0) {
                 payoutList.innerHTML = '<div class="empty-state"><div class="empty-icon">💰</div><p>No pending payouts</p></div>';
             }
@@ -5468,6 +5681,13 @@ return `
                 })
                 .then(() => {
                     showToast('✅ Payout marked as paid and saved to history!', 'success');
+                    payouts = payouts.map(p => String(p.id) === String(payoutId) ? {
+                        ...p,
+                        status: 'paid',
+                        paidDate: historyRecord.paidDate,
+                        method,
+                        reference
+                    } : p);
                     closeMarkPaidModal();
                     refreshPayoutViews();
                     autoCalculatePayouts();
@@ -5534,29 +5754,40 @@ return `
             
             adminUsers.forEach(user => {
                 const userSales = sales.filter(s => s.userId === user.id && s.sold);
-                
+
                 const totalCommission = userSales.reduce((sum, s) => {
                     return sum + ((s.commission || 0) * s.quantity);
                 }, 0);
-                
-                if (totalCommission > 0) {
-                    const existingPayout = payouts.find(p => p.userId === user.id && p.status === 'pending');
-                    
+
+                // Find the most recent paid payout to avoid regenerating payouts that were just settled
+                const latestPaid = payouts
+                    .filter(p => p.userId === user.id && p.status === 'paid')
+                    .sort((a, b) => new Date(b.paidDate || b.date || 0) - new Date(a.paidDate || a.date || 0))[0];
+
+                const lastPaidAmount = latestPaid ? Number(latestPaid.amount || 0) : 0;
+                const outstandingCommission = Math.max(totalCommission - lastPaidAmount, 0);
+
+                const existingPayout = payouts.find(p => p.userId === user.id && p.status === 'pending');
+
+                if (outstandingCommission > 0) {
                     if (existingPayout) {
                         getRef('payouts/' + existingPayout.id).update({
-                            amount: totalCommission,
+                            amount: outstandingCommission,
                             date: new Date().toISOString().split('T')[0]
                         });
                     } else {
                         const payout = {
                             id: Date.now() + user.id,
                             userId: user.id,
-                            amount: totalCommission,
+                            amount: outstandingCommission,
                             status: 'pending',
                             date: new Date().toISOString().split('T')[0]
                         };
                         getRef('payouts/' + payout.id).set(payout);
                     }
+                } else if (existingPayout) {
+                    // Remove stale pending payouts when there is no outstanding commission
+                    getRef('payouts/' + existingPayout.id).remove();
                 }
             });
         }
