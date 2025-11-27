@@ -3691,8 +3691,15 @@ function selectProfile(number) {
                 window.location.href = 'index.html';
                 return;
             }
-            
-            currentSession = JSON.parse(session);
+
+            try {
+                currentSession = JSON.parse(session);
+            } catch (error) {
+                console.error('Invalid session data found in storage:', error);
+                localStorage.removeItem('session');
+                window.location.href = 'index.html';
+                return;
+            }
             currentUsername = currentSession.username;
             console.log('✅ Logged in as:', currentSession.customName);
             
