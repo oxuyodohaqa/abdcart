@@ -310,14 +310,16 @@ async function createAccount({
 
     let verificationCode;
     let attempts = 0;
-    const maxAttempts = 12;
+    const maxAttempts = 4;
 
     do {
       verificationCode = await functionGetLink(email.split('@')[0], email.split('@')[1], selectedProxy);
       if (!verificationCode) {
         attempts++;
-        console.log(chalk.yellow(`${getCurrentTime()} Attempt ${attempts}/${maxAttempts} - No code yet, waiting...`));
-        await new Promise(resolve => setTimeout(resolve, 6000));
+        console.log(chalk.yellow(`${getCurrentTime()} Attempt ${attempts}/${maxAttempts} - No code yet, fast-skipping to next check`));
+        if (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       }
     } while (!verificationCode && attempts < maxAttempts);
 
