@@ -472,7 +472,7 @@ async function promptUser() {
     console.log(chalk.green.bold(`\n${getCurrentTime()} Starting with ${countryName} proxy`));
     console.log(chalk.green(`${getCurrentTime()} Creating ${loopCount} account(s)`));
     console.log(chalk.green(`${getCurrentTime()} Concurrency set to ${MAX_CONCURRENT_REQUESTS}, batch size set to ${BATCH_SIZE}`));
-    console.log(chalk.green(`${getCurrentTime()} Parallel batching enabled: up to ${Math.min(MAX_CONCURRENT_REQUESTS, BATCH_SIZE)} simultaneous attempts per batch.`));
+    console.log(chalk.green(`${getCurrentTime()} Turbo queue enabled: up to ${MAX_CONCURRENT_REQUESTS} simultaneous attempts across the entire run.`));
     const availableDomains = await getEmailRandom(selectedProxy);
     if (!availableDomains || availableDomains.length === 0) {
       console.log(chalk.red(`${getCurrentTime()} No domains available for signup.`));
@@ -484,47 +484,49 @@ async function promptUser() {
     const password = config.password;
     let successCount = 0;
     let attemptNumber = 0;
+    const maxAttempts = Math.max(loopCount * 3, loopCount + MAX_CONCURRENT_REQUESTS);
 
-    const runBatch = async (batchGoal) => {
-      const parallelAttempts = [];
-      const launchCount = Math.min(MAX_CONCURRENT_REQUESTS, batchGoal);
+    console.log(chalk.magenta(`${getCurrentTime()} Turbo mode enabled: up to ${MAX_CONCURRENT_REQUESTS} parallel agents until ${loopCount} successful registrations or ${maxAttempts} total attempts.`));
 
-      for (let i = 0; i < launchCount; i++) {
-        attemptNumber++;
-        const attempt = createAccount({
-          index: attemptNumber,
-          total: loopCount,
-          availableDomains,
-          selectedProxy,
-          password
-        }).then((success) => {
-          if (success) {
-            successCount++;
-            return 1;
-          }
-          return 0;
-        });
+    const runHighThroughput = async () => new Promise((resolve) => {
+      const inFlight = new Set();
 
-        parallelAttempts.push(attempt);
-      }
+      const launchNext = () => {
+        if (successCount >= loopCount || (attemptNumber >= maxAttempts && inFlight.size === 0)) {
+          return resolve();
+        }
 
-      const results = await Promise.all(parallelAttempts);
-      const batchSuccess = results.reduce((sum, result) => sum + result, 0);
+        while (inFlight.size < MAX_CONCURRENT_REQUESTS && attemptNumber < maxAttempts && successCount < loopCount) {
+          attemptNumber++;
+          const attemptPromise = createAccount({
+            index: attemptNumber,
+            total: loopCount,
+            availableDomains,
+            selectedProxy,
+            password
+          }).then((success) => {
+            if (success) {
+              successCount++;
+            }
+          }).finally(() => {
+            inFlight.delete(attemptPromise);
+            launchNext();
+          });
 
-      console.log(chalk.magenta(`${getCurrentTime()} Batch completed: ${batchSuccess} successful (total ${successCount}/${loopCount})`));
-    };
+          inFlight.add(attemptPromise);
+        }
+      };
 
-    while (successCount < loopCount) {
-      const remaining = loopCount - successCount;
-      const batchGoal = Math.min(BATCH_SIZE, remaining);
-      console.log(chalk.magenta(`${getCurrentTime()} Starting batch for up to ${batchGoal} account(s)`));
-      await runBatch(batchGoal);
-    }
+      launchNext();
+    });
+
+    await runHighThroughput();
 
     console.log(chalk.green.bold(`\n${getCurrentTime()} 🎉 All operations completed!`));
     console.log(chalk.cyan(`${getCurrentTime()} Successful registrations: ${successCount}/${loopCount}`));
     if (successCount < loopCount) {
-      console.log(chalk.yellow(`${getCurrentTime()} Some attempts failed; adjust proxy/domains or retry for more accounts.`));
+      const shortfall = loopCount - successCount;
+      console.log(chalk.yellow(`${getCurrentTime()} Some attempts failed; ${shortfall} still needed. Increase concurrency or attempt limit for even more speed.`));
     } else {
       console.log(chalk.green(`${getCurrentTime()} Requested account total reached.`));
     }
