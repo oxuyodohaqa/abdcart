@@ -486,32 +486,43 @@ async function promptUser() {
     let attemptNumber = 0;
 
     const runBatch = async (batchGoal) => {
-      const parallelAttempts = [];
-      const launchCount = Math.min(MAX_CONCURRENT_REQUESTS, batchGoal);
+      let completed = 0;
+      let batchSuccess = 0;
+      const maxParallel = Math.min(MAX_CONCURRENT_REQUESTS, batchGoal);
 
-      for (let i = 0; i < launchCount; i++) {
-        attemptNumber++;
-        const attempt = createAccount({
-          index: attemptNumber,
-          total: loopCount,
-          availableDomains,
-          selectedProxy,
-          password
-        }).then((success) => {
-          if (success) {
-            successCount++;
-            return 1;
+      return new Promise((resolve) => {
+        const launchNext = () => {
+          if (completed >= batchGoal) {
+            console.log(chalk.magenta(`${getCurrentTime()} Batch completed: ${batchSuccess} successful (total ${successCount}/${loopCount})`));
+            return resolve();
           }
-          return 0;
-        });
 
-        parallelAttempts.push(attempt);
-      }
+          while (inFlight.size < maxParallel && completed + inFlight.size < batchGoal) {
+            attemptNumber++;
+            const attemptPromise = createAccount({
+              index: attemptNumber,
+              total: loopCount,
+              availableDomains,
+              selectedProxy,
+              password
+            }).then((success) => {
+              if (success) {
+                successCount++;
+                batchSuccess++;
+              }
+            }).finally(() => {
+              inFlight.delete(attemptPromise);
+              completed++;
+              launchNext();
+            });
 
-      const results = await Promise.all(parallelAttempts);
-      const batchSuccess = results.reduce((sum, result) => sum + result, 0);
+            inFlight.add(attemptPromise);
+          }
+        };
 
-      console.log(chalk.magenta(`${getCurrentTime()} Batch completed: ${batchSuccess} successful (total ${successCount}/${loopCount})`));
+        const inFlight = new Set();
+        launchNext();
+      });
     };
 
     while (successCount < loopCount) {
