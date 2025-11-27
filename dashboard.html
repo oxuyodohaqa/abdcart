@@ -238,6 +238,19 @@
             flex-wrap: wrap;
         }
 
+        button,
+        .btn,
+        .btn-small,
+        .action-btn,
+        .close-btn,
+        .profile-select-btn,
+        input[type="button"],
+        input[type="submit"],
+        input[type="reset"],
+        [role="button"] {
+            touch-action: manipulation;
+        }
+
         .btn-small {
             padding: 12px 20px;
             border: none;
@@ -422,6 +435,82 @@
             color: var(--primary);
             margin-bottom: 20px;
             font-family: var(--font-heading);
+        }
+
+        .admin-performance {
+            background: var(--card-bg);
+            border-radius: 25px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: var(--shadow-lg);
+            border: 3px solid var(--border-color);
+        }
+
+        .admin-performance-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 15px;
+        }
+
+        .admin-card {
+            background: var(--light);
+            border-radius: 16px;
+            padding: 16px;
+            border: 2px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+            display: grid;
+            gap: 10px;
+        }
+
+        .admin-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .admin-name {
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .admin-tag {
+            background: var(--primary);
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 0.8em;
+            font-weight: 700;
+        }
+
+        .admin-metric-row {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px 12px;
+            font-size: 0.95em;
+        }
+
+        .admin-metric-label {
+            color: var(--text-color);
+            opacity: 0.8;
+            font-weight: 600;
+        }
+
+        .admin-metric-value {
+            font-weight: 800;
+            color: var(--primary);
+            text-align: right;
+        }
+
+        .section-subtitle {
+            color: var(--text-color);
+            opacity: 0.7;
+            margin-top: -15px;
+            margin-bottom: 18px;
+            font-size: 0.95em;
         }
 
         .form-section {
@@ -1867,6 +1956,18 @@ body.dark-mode .profile-select-btn {
             <div class="chart-card">
                 <div class="chart-title">💰 Revenue Breakdown</div>
                 <canvas id="revenueChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Admin Performance -->
+        <div class="admin-performance" id="adminPerformanceSection" style="display: none;">
+            <h2 class="section-title">👥 Admin Performance</h2>
+            <p class="section-subtitle">Track each admin's sales, capital, profit, and salary for the selected period.</p>
+            <div class="admin-performance-list" id="adminEarningsList">
+                <div class="empty-state">
+                    <div class="empty-icon">👥</div>
+                    <p>No admins available</p>
+                </div>
             </div>
         </div>
 
@@ -3547,6 +3648,31 @@ function selectProfile(number) {
 }
 
 // =================== END SUBSCRIPTION PRODUCTS ===================
+        function applyTapOptimization(target = document) {
+            const elements = target.querySelectorAll('button, [role="button"], .btn, .btn-small, .action-btn, .close-btn, .profile-select-btn, input[type="button"], input[type="submit"], input[type="reset"]');
+            elements.forEach(el => {
+                if (el.style.touchAction !== 'manipulation') {
+                    el.style.touchAction = 'manipulation';
+                }
+            });
+        }
+
+        function setupTapOptimizationObserver() {
+            applyTapOptimization();
+
+            const observer = new MutationObserver(mutations => {
+                for (const mutation of mutations) {
+                    for (const node of mutation.addedNodes) {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            applyTapOptimization(node);
+                        }
+                    }
+                }
+            });
+
+            observer.observe(document.body, { childList: true, subtree: true });
+        }
+
         // =================== INITIALIZATION ===================
         function init() {
             console.log('🚀 Initializing...');
@@ -3556,6 +3682,7 @@ function selectProfile(number) {
             applySettings();
             // ✅ FIXED: Setup event listeners AFTER DOM is ready
             setupEventListeners();
+            setupTapOptimizationObserver();
         }
 
         function checkAuth() {
@@ -3579,6 +3706,8 @@ function selectProfile(number) {
                 document.getElementById('btnProducts').style.display = 'inline-block';
                 document.getElementById('btnPayout').style.display = 'inline-block';
                 document.getElementById('inventoryDashboardSection').style.display = 'block';
+                const adminPerformance = document.getElementById('adminPerformanceSection');
+                if (adminPerformance) adminPerformance.style.display = 'block';
                 // Load commission brackets for owner
                 loadCommissionBrackets();
             } else {
@@ -3587,6 +3716,8 @@ function selectProfile(number) {
                 document.getElementById('userFilter').style.display = 'none';
                 document.getElementById('adminColumn').style.display = 'none';
                 document.getElementById('dashboardSubtitle').textContent = currentSession.customName + "'s Dashboard";
+                const adminPerformance = document.getElementById('adminPerformanceSection');
+                if (adminPerformance) adminPerformance.style.display = 'none';
                 // Load commission brackets for admins to use in calculations
                 loadCommissionBrackets();
             }
@@ -3801,7 +3932,7 @@ function loadAllSalesData() {
             });
             console.log('📊 Sales distribution:', userSalesCount);
             
-            calculateStats();
+            updateStats();
             renderSalesTable();
             updateCharts();
         });
@@ -3827,7 +3958,7 @@ function loadAllSalesData() {
                     });
             
             console.log('✅ Admin loaded sales:', sales.length);
-            calculateStats();
+            updateStats();
             renderSalesTable();
             updateCharts();
         });
@@ -4469,9 +4600,9 @@ function deleteSale(saleId) {
 }
         // Edit Product
         function editProduct(productId) {
-            // Prevent admins from editing products
-            if (currentSession.role !== 'owner') {
-                showToast('❌ Only owner can edit product prices and rates', 'error');
+            // Allow both owners and admins to edit product pricing
+            if (currentSession.role !== 'owner' && currentSession.role !== 'admin') {
+                showToast('❌ Only admins and owners can edit product prices and rates', 'error');
                 return;
             }
             
@@ -5290,7 +5421,13 @@ function editSale(id) {
             updateCharts();
         }
 
-function getFilteredSales() {
+        function updateStats() {
+            calculateStats();
+            renderAdminEarnings();
+            refreshPayoutViews();
+        }
+
+function getFilteredSales(ignoreUserFilter = false) {
     const activePeriod = document.querySelector('.period-tab.active').dataset.period;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -5300,7 +5437,7 @@ function getFilteredSales() {
     console.log('🔍 Initial sales count:', filtered.length);
     
     // User filtering
-    if (currentSession.role === 'owner') {
+    if (currentSession.role === 'owner' && !ignoreUserFilter) {
         const selectedUserId = document.getElementById('userFilter').value;
         if (selectedUserId !== 'all') {
             filtered = filtered.filter(s => s.userId == selectedUserId); // Use loose equality
@@ -5393,6 +5530,78 @@ function calculateStats() {
     // Debug output
     console.log('📈 Final Stats:', stats);
     console.log('💰 Commission Rate:', bracketRate + '%');
+}
+
+function renderAdminEarnings() {
+    if (currentSession.role !== 'owner') {
+        const section = document.getElementById('adminPerformanceSection');
+        if (section) section.style.display = 'none';
+        return;
+    }
+
+    const section = document.getElementById('adminPerformanceSection');
+    const container = document.getElementById('adminEarningsList');
+    if (!section || !container) return;
+
+    section.style.display = 'block';
+
+    const adminUsers = users.filter(u => u.role === 'admin');
+    if (adminUsers.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">👥</div>
+                <p>No admins available</p>
+            </div>
+        `;
+        return;
+    }
+
+    const periodSales = getFilteredSales(true);
+
+    const cards = adminUsers.map(user => {
+        const userSales = periodSales.filter(s => s.userId === user.id && s.sold);
+
+        const totals = userSales.reduce((acc, sale) => {
+            const quantity = parseInt(sale.quantity) || 1;
+            const price = parseFloat(sale.price) || 0;
+            const buyPrice = parseFloat(sale.buyPrice) || 0;
+            const sellPrice = parseFloat(sale.sellPrice) || price;
+            const actualBuyPrice = buyPrice > 0 ? buyPrice : (sellPrice * 0.7);
+
+            acc.sales += price * quantity;
+            acc.capital += actualBuyPrice * quantity;
+            acc.profit += (sellPrice - actualBuyPrice) * quantity;
+            acc.salary += (parseFloat(sale.commission) || 0) * quantity;
+            acc.items += quantity;
+            return acc;
+        }, { sales: 0, capital: 0, profit: 0, salary: 0, items: 0 });
+
+        return `
+            <div class="admin-card">
+                <div class="admin-card-header">
+                    <div class="admin-name">👤 ${user.customName}</div>
+                    <span class="admin-tag">${totals.items} sold</span>
+                </div>
+                <div class="admin-metric-row">
+                    <span class="admin-metric-label">Total Sales</span>
+                    <span class="admin-metric-value">₱${totals.sales.toFixed(2)}</span>
+                    <span class="admin-metric-label">Total Capital</span>
+                    <span class="admin-metric-value">₱${totals.capital.toFixed(2)}</span>
+                    <span class="admin-metric-label">Total Profit</span>
+                    <span class="admin-metric-value">₱${totals.profit.toFixed(2)}</span>
+                    <span class="admin-metric-label">Salary (Commission)</span>
+                    <span class="admin-metric-value">₱${totals.salary.toFixed(2)}</span>
+                </div>
+            </div>
+        `;
+    }).filter(Boolean).join('');
+
+    container.innerHTML = cards || `
+        <div class="empty-state">
+            <div class="empty-icon">🕒</div>
+            <p>No sales for the selected period</p>
+        </div>
+    `;
 }
 
         // =================== RENDER SALES TABLE ===================
