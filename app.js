@@ -310,14 +310,16 @@ async function createAccount({
 
     let verificationCode;
     let attempts = 0;
-    const maxAttempts = 12;
+    const maxAttempts = 4;
 
     do {
       verificationCode = await functionGetLink(email.split('@')[0], email.split('@')[1], selectedProxy);
       if (!verificationCode) {
         attempts++;
-        console.log(chalk.yellow(`${getCurrentTime()} Attempt ${attempts}/${maxAttempts} - No code yet, waiting...`));
-        await new Promise(resolve => setTimeout(resolve, 6000));
+        console.log(chalk.yellow(`${getCurrentTime()} Attempt ${attempts}/${maxAttempts} - No code yet, fast-skipping to next check`));
+        if (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       }
     } while (!verificationCode && attempts < maxAttempts);
 
@@ -472,7 +474,7 @@ async function promptUser() {
     console.log(chalk.green.bold(`\n${getCurrentTime()} Starting with ${countryName} proxy`));
     console.log(chalk.green(`${getCurrentTime()} Creating ${loopCount} account(s)`));
     console.log(chalk.green(`${getCurrentTime()} Concurrency set to ${MAX_CONCURRENT_REQUESTS}, batch size set to ${BATCH_SIZE}`));
-    console.log(chalk.green(`${getCurrentTime()} Parallel batching enabled: up to ${Math.min(MAX_CONCURRENT_REQUESTS, BATCH_SIZE)} simultaneous attempts per batch.`));
+    console.log(chalk.green(`${getCurrentTime()} Turbo queue enabled: up to ${MAX_CONCURRENT_REQUESTS} simultaneous attempts across the entire run.`));
     const availableDomains = await getEmailRandom(selectedProxy);
     if (!availableDomains || availableDomains.length === 0) {
       console.log(chalk.red(`${getCurrentTime()} No domains available for signup.`));
@@ -484,58 +486,49 @@ async function promptUser() {
     const password = config.password;
     let successCount = 0;
     let attemptNumber = 0;
+    const maxAttempts = Math.max(loopCount * 3, loopCount + MAX_CONCURRENT_REQUESTS);
 
-    const runBatch = async (batchGoal) => {
-      let completed = 0;
-      let batchSuccess = 0;
-      const maxParallel = Math.min(MAX_CONCURRENT_REQUESTS, batchGoal);
+    console.log(chalk.magenta(`${getCurrentTime()} Turbo mode enabled: up to ${MAX_CONCURRENT_REQUESTS} parallel agents until ${loopCount} successful registrations or ${maxAttempts} total attempts.`));
 
-      return new Promise((resolve) => {
-        const launchNext = () => {
-          if (completed >= batchGoal) {
-            console.log(chalk.magenta(`${getCurrentTime()} Batch completed: ${batchSuccess} successful (total ${successCount}/${loopCount})`));
-            return resolve();
-          }
+    const runHighThroughput = async () => new Promise((resolve) => {
+      const inFlight = new Set();
 
-          while (inFlight.size < maxParallel && completed + inFlight.size < batchGoal) {
-            attemptNumber++;
-            const attemptPromise = createAccount({
-              index: attemptNumber,
-              total: loopCount,
-              availableDomains,
-              selectedProxy,
-              password
-            }).then((success) => {
-              if (success) {
-                successCount++;
-                batchSuccess++;
-              }
-            }).finally(() => {
-              inFlight.delete(attemptPromise);
-              completed++;
-              launchNext();
-            });
+      const launchNext = () => {
+        if (successCount >= loopCount || (attemptNumber >= maxAttempts && inFlight.size === 0)) {
+          return resolve();
+        }
 
-            inFlight.add(attemptPromise);
-          }
-        };
+        while (inFlight.size < MAX_CONCURRENT_REQUESTS && attemptNumber < maxAttempts && successCount < loopCount) {
+          attemptNumber++;
+          const attemptPromise = createAccount({
+            index: attemptNumber,
+            total: loopCount,
+            availableDomains,
+            selectedProxy,
+            password
+          }).then((success) => {
+            if (success) {
+              successCount++;
+            }
+          }).finally(() => {
+            inFlight.delete(attemptPromise);
+            launchNext();
+          });
 
-        const inFlight = new Set();
-        launchNext();
-      });
-    };
+          inFlight.add(attemptPromise);
+        }
+      };
 
-    while (successCount < loopCount) {
-      const remaining = loopCount - successCount;
-      const batchGoal = Math.min(BATCH_SIZE, remaining);
-      console.log(chalk.magenta(`${getCurrentTime()} Starting batch for up to ${batchGoal} account(s)`));
-      await runBatch(batchGoal);
-    }
+      launchNext();
+    });
+
+    await runHighThroughput();
 
     console.log(chalk.green.bold(`\n${getCurrentTime()} 🎉 All operations completed!`));
     console.log(chalk.cyan(`${getCurrentTime()} Successful registrations: ${successCount}/${loopCount}`));
     if (successCount < loopCount) {
-      console.log(chalk.yellow(`${getCurrentTime()} Some attempts failed; adjust proxy/domains or retry for more accounts.`));
+      const shortfall = loopCount - successCount;
+      console.log(chalk.yellow(`${getCurrentTime()} Some attempts failed; ${shortfall} still needed. Increase concurrency or attempt limit for even more speed.`));
     } else {
       console.log(chalk.green(`${getCurrentTime()} Requested account total reached.`));
     }
