@@ -46,10 +46,10 @@ const countryNames = {
   es: 'Spain'
 };
 
-const DEFAULT_CONCURRENCY = 10;
 const DEFAULT_BATCH_SIZE = 50;
-let MAX_CONCURRENT_REQUESTS = Number(config.maxConcurrent) > 0 ? Number(config.maxConcurrent) : DEFAULT_CONCURRENCY;
+const DEFAULT_CONCURRENCY = DEFAULT_BATCH_SIZE;
 let BATCH_SIZE = Number(config.batchSize) > 0 ? Number(config.batchSize) : DEFAULT_BATCH_SIZE;
+let MAX_CONCURRENT_REQUESTS = Number(config.maxConcurrent) > 0 ? Number(config.maxConcurrent) : DEFAULT_CONCURRENCY;
 
 function fetchWithProxy(url, options = {}, proxyUrl) {
   if (proxyUrl) {
@@ -457,19 +457,22 @@ async function promptUser() {
     const selectedProxy = proxies[country];
     const countryName = countryNames[country];
 
-    const parsedConcurrency = parseInt(concurrencyInput, 10);
-    if (!isNaN(parsedConcurrency) && parsedConcurrency > 0) {
-      MAX_CONCURRENT_REQUESTS = parsedConcurrency;
-    }
-
     const parsedBatch = parseInt(batchInput, 10);
     if (!isNaN(parsedBatch) && parsedBatch > 0) {
       BATCH_SIZE = parsedBatch;
     }
 
+    const parsedConcurrency = parseInt(concurrencyInput, 10);
+    if (!isNaN(parsedConcurrency) && parsedConcurrency > 0) {
+      MAX_CONCURRENT_REQUESTS = parsedConcurrency;
+    } else {
+      MAX_CONCURRENT_REQUESTS = BATCH_SIZE;
+    }
+
     console.log(chalk.green.bold(`\n${getCurrentTime()} Starting with ${countryName} proxy`));
     console.log(chalk.green(`${getCurrentTime()} Creating ${loopCount} account(s)`));
     console.log(chalk.green(`${getCurrentTime()} Concurrency set to ${MAX_CONCURRENT_REQUESTS}, batch size set to ${BATCH_SIZE}`));
+    console.log(chalk.green(`${getCurrentTime()} Parallel batching enabled: up to ${Math.min(MAX_CONCURRENT_REQUESTS, BATCH_SIZE)} simultaneous attempts per batch.`));
     const availableDomains = await getEmailRandom(selectedProxy);
     if (!availableDomains || availableDomains.length === 0) {
       console.log(chalk.red(`${getCurrentTime()} No domains available for signup.`));
@@ -483,47 +486,30 @@ async function promptUser() {
     let attemptNumber = 0;
 
     const runBatch = async (batchGoal) => {
-      let batchSuccess = 0;
-      const activePromises = new Set();
+      const parallelAttempts = [];
+      const launchCount = Math.min(MAX_CONCURRENT_REQUESTS, batchGoal);
 
-      const queueNext = () => {
-        while (activePromises.size < MAX_CONCURRENT_REQUESTS && batchSuccess < batchGoal && successCount < loopCount) {
-          attemptNumber++;
-          const promise = createAccount({
-            index: attemptNumber,
-            total: loopCount,
-            availableDomains,
-            selectedProxy,
-            password
-          }).then((success) => {
-            if (success) {
-              batchSuccess++;
-              successCount++;
-            }
-          }).finally(() => {
-            activePromises.delete(promise);
-          });
+      for (let i = 0; i < launchCount; i++) {
+        attemptNumber++;
+        const attempt = createAccount({
+          index: attemptNumber,
+          total: loopCount,
+          availableDomains,
+          selectedProxy,
+          password
+        }).then((success) => {
+          if (success) {
+            successCount++;
+            return 1;
+          }
+          return 0;
+        });
 
-          activePromises.add(promise);
-        }
-      };
-
-      queueNext();
-
-      while (batchSuccess < batchGoal && successCount < loopCount) {
-        if (activePromises.size === 0) {
-          queueNext();
-        }
-
-        if (activePromises.size === 0) {
-          break;
-        }
-
-        await Promise.race(activePromises);
-        queueNext();
+        parallelAttempts.push(attempt);
       }
 
-      await Promise.all(activePromises);
+      const results = await Promise.all(parallelAttempts);
+      const batchSuccess = results.reduce((sum, result) => sum + result, 0);
 
       console.log(chalk.magenta(`${getCurrentTime()} Batch completed: ${batchSuccess} successful (total ${successCount}/${loopCount})`));
     };
