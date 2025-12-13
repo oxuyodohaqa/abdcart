@@ -183,7 +183,13 @@ class EducatorDocumentGenerator:
         except Exception:
             font = ImageFont.load_default()
 
-        text_width, text_height = draw.textsize(initials, font=font)
+        try:
+            bbox = draw.textbbox((0, 0), initials, font=font)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+        except Exception:
+            text_width, text_height = font.getsize(initials)
+
         text_x = (img_size - text_width) / 2
         text_y = (img_size - text_height) / 2
         draw.text((text_x, text_y), initials, fill=text_rgb, font=font)
