@@ -42,6 +42,17 @@ def clean_name(name: str) -> str:
     name = re.sub(r"\s+", " ", name).strip()
     return name
 
+
+def sanitize_school_address(address: str) -> str:
+    """Remove apartment/unit markers and normalize spacing for official addresses."""
+    if not address:
+        return ""
+
+    cleaned = address.replace("\n", " ")
+    cleaned = re.sub(r",?\s*(Apt\.?|Apartment|Unit|Suite|Ste\.?|#)\s*[A-Za-z0-9-]+", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip().strip(',')
+    return cleaned
+
 # ==================== USA K-12 SCHOOL CONFIGURATION ====================
 K12_SCHOOL_TYPES = {
     'ELEMENTARY': {
@@ -233,7 +244,7 @@ class EducatorDocumentGenerator:
                     if school.get('type') == self.selected_school_type:
                         filtered_schools.append({
                             'name': school['name'],
-                            'address': school.get('address', ''),
+                            'address': sanitize_school_address(school.get('address', '')),
                             'district': school.get('district', ''),
                             'phone': school.get('phone', ''),
                             'email': school.get('email', ''),
@@ -266,7 +277,7 @@ class EducatorDocumentGenerator:
             state = random.choice(USA_CONFIG['states'])
             sample_schools.append({
                 'name': f"{school_prefix} {suffix}",
-                'address': f"{self.faker.street_address()}, {city}, {state} {self.faker.zipcode()}",
+                'address': sanitize_school_address(f"{self.faker.street_address()}, {city}, {state} {self.faker.zipcode()}"),
                 'district': f"{city} School District",
                 'phone': f"({random.randint(200, 999)}) {random.randint(200, 999)}-{random.randint(1000, 9999)}",
                 'email': f"info@{school_prefix.lower()}{suffix.replace(' ', '').lower()}.edu",
@@ -324,7 +335,7 @@ class EducatorDocumentGenerator:
                 domain = re.sub(r"[^a-zA-Z0-9]", "", self.custom_school_name).lower()
                 self.custom_school_data = {
                     'name': self.custom_school_name,
-                    'address': f"{self.faker.street_address()}, {city}, {state} {self.faker.zipcode()}",
+                    'address': sanitize_school_address(f"{self.faker.street_address()}, {city}, {state} {self.faker.zipcode()}"),
                     'district': f"{city} School District",
                     'phone': f"({random.randint(200, 999)}) {random.randint(200, 999)}-{random.randint(1000, 9999)}",
                     'email': f"info@{domain or 'school'}.edu",
@@ -370,7 +381,7 @@ class EducatorDocumentGenerator:
             "subject_area": subject,
             "email": f"{first_name.lower()}.{last_name.lower()}@{school['email'].split('@')[1]}",
             "phone": school['phone'],
-            "address": self.faker.address(),
+            "address": sanitize_school_address(self.faker.address()),
             "date_issued": datetime.now()
         }
     
@@ -404,18 +415,20 @@ class EducatorDocumentGenerator:
                 'HeaderStyle',
                 parent=styles['Heading1'],
                 fontSize=18,
+                fontName="Times-Bold",
                 textColor=self.colors['primary'],
                 alignment=0,
-                spaceAfter=6
+                spaceAfter=4
             )
 
             address_style = ParagraphStyle(
                 'AddressStyle',
                 parent=styles['Normal'],
                 fontSize=10,
+                fontName="Times-Roman",
                 textColor=self.colors['text_light'],
                 alignment=0,
-                spaceAfter=4
+                spaceAfter=6
             )
 
             logo_path = self.generate_school_logo(school['name'])
@@ -436,10 +449,11 @@ class EducatorDocumentGenerator:
                 ('BOX', (0, 0), (-1, -1), 0.75, self.colors['border']),
                 ('SPAN', (1, 0), (1, 1)),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('LEFTPADDING', (0, 0), (-1, -1), 10),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
-                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('LEFTPADDING', (0, 0), (-1, -1), 12),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+                ('TOPPADDING', (0, 0), (-1, -1), 10),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('LINEBELOW', (0, 1), (1, 1), 1, self.colors['border'])
             ]))
 
             elements.append(letterhead_table)
@@ -451,8 +465,10 @@ class EducatorDocumentGenerator:
                 'DateStyle',
                 parent=styles['Normal'],
                 fontSize=11,
+                fontName="Times-Roman",
                 textColor=self.colors['text_dark'],
-                alignment=0
+                alignment=0,
+                spaceAfter=4
             )
             
             current_date = datetime.now().strftime(USA_CONFIG['date_format'])
@@ -465,13 +481,14 @@ class EducatorDocumentGenerator:
             subject_style = ParagraphStyle(
                 'SubjectStyle',
                 parent=styles['Heading2'],
-                fontSize=14,
+                fontSize=13,
+                fontName="Times-Bold",
                 textColor=self.colors['primary'],
                 alignment=0,
-                spaceAfter=10
+                spaceAfter=8
             )
-            
-            subject = Paragraph("EMPLOYMENT & EDUCATOR STATUS VERIFICATION", subject_style)
+
+            subject = Paragraph("EMPLOYMENT VERIFICATION LETTER", subject_style)
             elements.append(subject)
             
             elements.append(Spacer(1, 20))
@@ -481,26 +498,31 @@ class EducatorDocumentGenerator:
                 'BodyStyle',
                 parent=styles['Normal'],
                 fontSize=11,
+                fontName="Times-Roman",
+                leading=14,
                 textColor=self.colors['text_dark'],
                 alignment=4,  # Justified
                 spaceAfter=10
             )
             
+            job_title_display = educator_data['job_title']
+            if 'teacher' not in job_title_display.lower():
+                job_title_display = f"{job_title_display} (Educator)"
+
             letter_body = f"""
             To Whom It May Concern:<br/><br/>
 
-            This letter confirms that <b>{educator_data['full_name']}</b> (Employee ID: {educator_data['employee_id']})
-            is employed full-time at <b>{school['name']}</b>, a K–12 academic institution, during the
-            <b>{USA_CONFIG['school_year']} academic year</b>.<br/><br/>
+            This letter confirms that <b>{educator_data['full_name']}</b> is currently employed full-time as a
+            <b>{job_title_display}</b> at <b>{school['name']}</b>, a K–12 accredited educational institution.<br/><br/>
 
-            {educator_data['full_name']} serves as a <b>{educator_data['job_title']}</b> and <b>ACTIVE CLASSROOM INSTRUCTOR</b>.
-            As part of their regular assigned duties, they teach
-            <b>{educator_data['subject_area']}</b> to <b>{educator_data['grade_level']}</b> students.<br/><br/>
+            {educator_data['full_name']} is an active classroom educator during the <b>{USA_CONFIG['school_year']}</b> academic year.
+            As part of their regular duties, they teach <b>{educator_data['subject_area']}</b> to <b>{educator_data['grade_level']}</b>
+            students.<br/><br/>
 
-            Employment Status: <b>Full-Time</b><br/>
-            Start Date: <b>{educator_data['hire_date'].strftime(USA_CONFIG['date_format'])}</b><br/><br/>
+            Employment Start Date: <b>{educator_data['hire_date'].strftime(USA_CONFIG['date_format'])}</b><br/>
+            Current Employment Status: <b>Active, Full-Time</b><br/><br/>
 
-            This letter is issued for educator verification purposes.<br/><br/>
+            If further verification is required, please contact our office.<br/><br/>
             """
             
             body = Paragraph(letter_body, body_style)
@@ -513,16 +535,18 @@ class EducatorDocumentGenerator:
                 'SigStyle',
                 parent=styles['Normal'],
                 fontSize=11,
+                fontName="Times-Roman",
                 textColor=self.colors['text_dark'],
                 alignment=0,
                 spaceAfter=5
             )
-            
+
             signature_text = (
-                f"Sincerely,<br/><br/><br/>"
-                f"{school['principal']}<br/>"
-                f"Principal / HR Manager<br/>"
+                "Signed:<br/><br/><br/>"
+                f"<u>{school['principal']}</u><br/>"
+                "Principal / Human Resources<br/>"
                 f"{school['name']}<br/>"
+                f"Address: {school['address']}<br/>"
                 f"Phone: {school['phone']}<br/>"
                 f"Email: {school['email']}"
             )
