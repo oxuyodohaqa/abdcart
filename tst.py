@@ -27,7 +27,7 @@ import time
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
 from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -47,22 +47,23 @@ K12_SCHOOL_TYPES = {
     'ELEMENTARY': {
         'grades': ['K', '1st', '2nd', '3rd', '4th', '5th'],
         'subjects': ['Reading', 'Mathematics', 'Science', 'Social Studies', 'Art', 'Music', 'Physical Education'],
-        'job_titles': ['Elementary Teacher', 'Grade Level Teacher', 'Special Education Teacher',
-                      'Reading Specialist', 'Math Specialist', 'School Counselor', 'Librarian']
+        'job_titles': ['Elementary Teacher', 'Grade Level Teacher', 'Classroom Teacher',
+                      'Special Education Teacher', 'Reading Specialist', 'Math Specialist',
+                      'Arts Instructor', 'Music Instructor']
     },
     'MIDDLE': {
         'grades': ['6th', '7th', '8th'],
         'subjects': ['English Language Arts', 'Mathematics', 'Science', 'Social Studies',
                     'Foreign Language', 'Art', 'Music', 'Physical Education', 'Technology'],
         'job_titles': ['Middle School Teacher', 'Subject Teacher', 'Special Education Teacher',
-                      'Department Chair', 'School Counselor', 'Athletic Director']
+                      'STEM Instructor', 'Language Instructor', 'Arts Instructor']
     },
     'HIGH': {
         'grades': ['9th', '10th', '11th', '12th'],
         'subjects': ['English', 'Mathematics', 'Science', 'Social Studies', 'Foreign Language',
                     'Art', 'Music', 'Physical Education', 'Technology', 'Career Education'],
-        'job_titles': ['High School Teacher', 'Subject Teacher', 'Department Chair',
-                      'Special Education Teacher', 'School Counselor', 'Athletic Director', 'Dean of Students']
+        'job_titles': ['High School Teacher', 'Subject Teacher', 'Special Education Teacher',
+                      'AP Instructor', 'Honors Instructor', 'Career Education Instructor']
     }
 }
 
@@ -119,6 +120,8 @@ class EducatorDocumentGenerator:
         self.selected_school_type = preselected_school_type if preselected_school_type in K12_SCHOOL_TYPES else None
         self.schools = []
 
+        self.logo_cache = {}
+
         self.custom_teacher_name = clean_name(custom_teacher_name) if custom_teacher_name else None
         self.custom_school_name = clean_name(custom_school_name) if custom_school_name else None
         self.custom_school_data = None
@@ -139,12 +142,55 @@ class EducatorDocumentGenerator:
             "row_even": colors.white,
             "row_odd": colors.HexColor("#f3f4f6")
         }
-        
+
         self.create_directories()
         self.clear_all_data()
     
     def create_directories(self):
         os.makedirs(self.documents_dir, exist_ok=True)
+
+    def generate_school_logo(self, school_name: str) -> str:
+        """Generate a simple school logo image using initials and return the file path."""
+        if not school_name:
+            return ""
+
+        cache_key = school_name.strip().lower()
+        if cache_key in self.logo_cache:
+            return self.logo_cache[cache_key]
+
+        slug = re.sub(r"[^A-Za-z0-9]+", "_", cache_key).strip("_") or "school"
+        logo_path = os.path.join(self.documents_dir, f"{slug}_logo.png")
+
+        primary_rgb = (30, 58, 138)
+        accent_rgb = (5, 150, 105)
+        text_rgb = (255, 255, 255)
+
+        img_size = 240
+        img = Image.new("RGB", (img_size, img_size), primary_rgb)
+        draw = ImageDraw.Draw(img)
+
+        inset = 16
+        draw.rounded_rectangle(
+            [(inset, inset), (img_size - inset, img_size - inset)],
+            radius=28,
+            outline=accent_rgb,
+            width=6
+        )
+
+        initials = "".join(part[0].upper() for part in school_name.split()[:3] if part) or "EDU"
+        try:
+            font = ImageFont.truetype("DejaVuSans-Bold.ttf", 96)
+        except Exception:
+            font = ImageFont.load_default()
+
+        text_width, text_height = draw.textsize(initials, font=font)
+        text_x = (img_size - text_width) / 2
+        text_y = (img_size - text_height) / 2
+        draw.text((text_x, text_y), initials, fill=text_rgb, font=font)
+
+        img.save(logo_path, format="PNG")
+        self.logo_cache[cache_key] = logo_path
+        return logo_path
     
     def clear_all_data(self):
         try:
@@ -354,26 +400,45 @@ class EducatorDocumentGenerator:
                 fontSize=18,
                 textColor=self.colors['primary'],
                 alignment=0,
-                spaceAfter=10
+                spaceAfter=6
             )
-            
-            header = Paragraph(school['name'], header_style)
-            elements.append(header)
-            
-            # School Address
+
             address_style = ParagraphStyle(
                 'AddressStyle',
                 parent=styles['Normal'],
                 fontSize=10,
                 textColor=self.colors['text_light'],
                 alignment=0,
-                spaceAfter=20
+                spaceAfter=4
             )
-            
-            address = Paragraph(f"{school['address']}<br/>{school['district']}<br/>Phone: {school['phone']}", address_style)
-            elements.append(address)
-            
-            elements.append(Spacer(1, 30))
+
+            logo_path = self.generate_school_logo(school['name'])
+            logo_image = RLImage(logo_path, width=0.85 * inch, height=0.85 * inch) if logo_path else Spacer(0, 0)
+
+            header_block = Paragraph(school['name'], header_style)
+            address_block = Paragraph(
+                f"{school['address']}<br/>{school['district']}<br/>Phone: {school['phone']}<br/>{USA_CONFIG['flag']} United States",
+                address_style
+            )
+
+            letterhead_table = Table(
+                [[logo_image, header_block], [Spacer(0, 0), address_block]],
+                colWidths=[1 * inch, 5 * inch]
+            )
+            letterhead_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), self.colors['row_odd']),
+                ('BOX', (0, 0), (-1, -1), 0.75, self.colors['border']),
+                ('SPAN', (1, 0), (1, 1)),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ]))
+
+            elements.append(letterhead_table)
+
+            elements.append(Spacer(1, 24))
             
             # Date
             date_style = ParagraphStyle(
@@ -400,7 +465,7 @@ class EducatorDocumentGenerator:
                 spaceAfter=10
             )
             
-            subject = Paragraph("EMPLOYMENT VERIFICATION LETTER", subject_style)
+            subject = Paragraph("EMPLOYMENT & EDUCATOR STATUS VERIFICATION", subject_style)
             elements.append(subject)
             
             elements.append(Spacer(1, 20))
@@ -417,20 +482,19 @@ class EducatorDocumentGenerator:
             
             letter_body = f"""
             To Whom It May Concern:<br/><br/>
-            
-            This letter confirms that <b>{educator_data['full_name']}</b> (Employee ID: {educator_data['employee_id']}) 
-            is employed by <b>{school['name']}</b> as a <b>{educator_data['job_title']}</b>.<br/><br/>
-            
-            {educator_data['full_name']} began employment with our school on 
-            <b>{educator_data['hire_date'].strftime(USA_CONFIG['date_format'])}</b> and is currently employed 
-            in a full-time capacity.<br/><br/>
-            
-            In their role as {educator_data['job_title']}, they are responsible for {educator_data['subject_area']} 
-            instruction and related educational duties.<br/><br/>
-            
-            This individual is a valued member of our educational team and is in good standing with our institution.<br/><br/>
-            
-            This verification is provided at the request of the employee for personal purposes.<br/><br/>
+
+            This letter confirms that <b>{educator_data['full_name']}</b> (Employee ID: {educator_data['employee_id']})
+            is employed full-time at <b>{school['name']}</b>, a K–12 academic institution, during the
+            <b>{USA_CONFIG['school_year']} academic year</b>.<br/><br/>
+
+            {educator_data['full_name']} serves as a <b>{educator_data['job_title']}</b> and <b>ACTIVE CLASSROOM INSTRUCTOR</b>.
+            As part of their regular assigned duties, they teach
+            <b>{educator_data['subject_area']}</b> to <b>{educator_data['grade_level']}</b> students.<br/><br/>
+
+            Employment Status: <b>Full-Time</b><br/>
+            Start Date: <b>{educator_data['hire_date'].strftime(USA_CONFIG['date_format'])}</b><br/><br/>
+
+            This letter is issued for educator verification purposes.<br/><br/>
             """
             
             body = Paragraph(letter_body, body_style)
@@ -448,15 +512,15 @@ class EducatorDocumentGenerator:
                 spaceAfter=5
             )
             
-            signature = Paragraph(
+            signature_text = (
                 f"Sincerely,<br/><br/><br/>"
                 f"{school['principal']}<br/>"
-                f"Principal<br/>"
+                f"Principal / HR Manager<br/>"
                 f"{school['name']}<br/>"
                 f"Phone: {school['phone']}<br/>"
-                f"Email: {school['email']}",
-                sig_style
+                f"Email: {school['email']}"
             )
+            signature = Paragraph(signature_text, sig_style)
             elements.append(signature)
             
             # Footer
@@ -541,6 +605,9 @@ class EducatorDocumentGenerator:
                 spaceAfter=10
             )
 
+            logo_path = self.generate_school_logo(school['name'])
+            logo_image = RLImage(logo_path, width=0.8 * inch, height=0.8 * inch) if logo_path else Spacer(0, 0)
+
             letterhead_left = Paragraph(
                 f"<b>{school['name']}</b><br/>{school['district']}<br/>{school['address']}<br/>"
                 f"Phone: {school['phone']}<br/>Email: {school['email']}",
@@ -567,8 +634,8 @@ class EducatorDocumentGenerator:
             )
 
             letterhead_table = Table(
-                [[letterhead_left, letterhead_right]],
-                colWidths=[3.5 * inch, 2.5 * inch]
+                [[logo_image, letterhead_left, letterhead_right]],
+                colWidths=[0.9 * inch, 3 * inch, 2.1 * inch]
             )
             letterhead_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, -1), self.colors['row_odd']),
@@ -720,6 +787,9 @@ class EducatorDocumentGenerator:
             elements = []
             styles = getSampleStyleSheet()
 
+            logo_path = self.generate_school_logo(educator_data['school']['name'])
+            logo_image = RLImage(logo_path, width=0.8 * inch, height=0.8 * inch) if logo_path else Spacer(0, 0)
+
             letterhead_left = Paragraph(
                 f"<b>{educator_data['school']['name']}</b><br/>{educator_data['school']['district']}<br/>"
                 f"Payroll Department • {educator_data['school']['address']}",
@@ -745,8 +815,8 @@ class EducatorDocumentGenerator:
             )
 
             letterhead_table = Table(
-                [[letterhead_left, letterhead_right]],
-                colWidths=[3.5 * inch, 2.5 * inch]
+                [[logo_image, letterhead_left, letterhead_right]],
+                colWidths=[0.9 * inch, 3 * inch, 2.1 * inch]
             )
             letterhead_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, -1), self.colors['row_odd']),
