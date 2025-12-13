@@ -113,32 +113,22 @@ class FastSchoolsUniversitiesExtractor:
     def is_k12_school(self, institution: Dict) -> bool:
         """STRICT validation - ONLY K-12 schools"""
         name = institution.get('name', '').strip()
-        
+
         if not name or len(name) < 2:
             return False
-        
+
+        if not self.is_english_only(name):
+            return False
+
         inst_type = institution.get('type', '').upper()
         org_type = institution.get('organizationType', '').upper()
-        
-        if inst_type in self.allowed_types or org_type in self.allowed_types:
-            return True
 
         if inst_type in self.excluded_types or org_type in self.excluded_types:
             return False
-        
-        name_lower = name.lower()
-        school_keywords = [
-            'high school', 'middle school', 'elementary', 'primary',
-            'secondary', 'k12', 'academy', 'school'
-        ]
-        
-        for keyword in school_keywords:
-            if keyword in name_lower:
-                return True
-        
-        if not self.is_english_only(name):
-            return False
-        
+
+        if inst_type in self.allowed_types or org_type in self.allowed_types:
+            return True
+
         return False
 
     def get_headers(self) -> Dict[str, str]:
