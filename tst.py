@@ -14,6 +14,7 @@ import sys
 import os
 import re
 import logging
+import argparse
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from faker import Faker
@@ -85,11 +86,15 @@ USA_CONFIG = {
 }
 
 class EducatorDocumentGenerator:
-    def __init__(self):
+    def __init__(self, custom_teacher_name=None, custom_school_name=None):
         self.documents_dir = "educator_documents"
         self.employees_file = "educators.txt"
         self.selected_school_type = None
         self.schools = []
+
+        self.custom_teacher_name = clean_name(custom_teacher_name) if custom_teacher_name else None
+        self.custom_school_name = clean_name(custom_school_name) if custom_school_name else None
+        self.custom_school_data = None
         
         self.faker = Faker('en_US')
         
@@ -222,11 +227,35 @@ class EducatorDocumentGenerator:
     
     def generate_educator_data(self):
         """Generate educator data with all required fields."""
-        first_name = self.faker.first_name()
-        last_name = self.faker.last_name()
-        full_name = clean_name(f"{first_name} {last_name}")
-        
-        school = random.choice(self.schools)
+        if self.custom_teacher_name:
+            name_parts = self.custom_teacher_name.split()
+            if len(name_parts) >= 2:
+                first_name, last_name = name_parts[0], name_parts[-1]
+            else:
+                first_name = self.custom_teacher_name
+                last_name = self.faker.last_name()
+            full_name = self.custom_teacher_name
+        else:
+            first_name = self.faker.first_name()
+            last_name = self.faker.last_name()
+            full_name = clean_name(f"{first_name} {last_name}")
+
+        if self.custom_school_name:
+            if not self.custom_school_data:
+                city = self.faker.city()
+                state = random.choice(USA_CONFIG['states'])
+                domain = re.sub(r"[^a-zA-Z0-9]", "", self.custom_school_name).lower()
+                self.custom_school_data = {
+                    'name': self.custom_school_name,
+                    'address': f"{self.faker.street_address()}, {city}, {state} {self.faker.zipcode()}",
+                    'district': f"{city} School District",
+                    'phone': f"({random.randint(200, 999)}) {random.randint(200, 999)}-{random.randint(1000, 9999)}",
+                    'email': f"info@{domain or 'school'}.edu",
+                    'principal': f"Dr. {self.faker.last_name()}"
+                }
+            school = self.custom_school_data
+        else:
+            school = random.choice(self.schools)
         school_type_config = K12_SCHOOL_TYPES[self.selected_school_type]
         
         # Generate employment data
@@ -947,6 +976,11 @@ class EducatorDocumentGenerator:
         print("="*70)
 
 def main():
+    parser = argparse.ArgumentParser(description="Generate educator verification documents.")
+    parser.add_argument("--teacher-name", help="Teacher name to use in generated documents", default=None)
+    parser.add_argument("--school-name", help="School name to use in generated documents", default=None)
+    args = parser.parse_args()
+
     print("\n" + "="*70)
     print("PROFESSIONAL EDUCATOR DOCUMENT GENERATOR - USA K-12 SCHOOLS")
     print("="*70)
@@ -960,9 +994,17 @@ def main():
     print("   2. School Employment Contract")
     print("   3. Recent Pay Stub")
     print("="*70)
-    
-    generator = EducatorDocumentGenerator()
-    
+
+    generator = EducatorDocumentGenerator(
+        custom_teacher_name=args.teacher_name,
+        custom_school_name=args.school_name
+    )
+
+    if args.teacher_name:
+        print(f"🧑‍🏫 Using provided teacher name: {generator.custom_teacher_name}")
+    if args.school_name:
+        print(f"🏫 Using provided school name: {generator.custom_school_name}")
+
     if not generator.select_school_type():
         return
     
