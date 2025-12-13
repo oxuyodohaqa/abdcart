@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
-PROFESSIONAL TUITION RECEIPT GENERATOR WITH INSTANT APPROVAL - PERFECT FOR SHEERID
-✅ TUITION RECEIPT: Professional receipt with all required fields
-✅ CLASS SCHEDULE: Complete schedule with enrollment proof
-✅ INSTANT APPROVAL: Super-fast verification system
+PROFESSIONAL EMPLOYMENT DOCUMENT GENERATOR - PERFECT FOR VERIFICATION
+✅ EMPLOYMENT VERIFICATION LETTER: Professional verification letter
+✅ EMPLOYMENT CONTRACT: Official school employment contract  
+✅ EMPLOYEE PAY STUB: Detailed salary payment stub
+✅ INSTANT VERIFICATION: Super-fast verification system
 ✅ INSTITUTION NAME: Full school name from JSON only  
-✅ STUDENT INFO: Name, ID, Program, Semester, Payment Proof
-✅ HARDCODED DATES: Current/upcoming term dates
+✅ EMPLOYEE INFO: Name, ID, Position, Department, Salary Proof
+✅ HARDCODED DATES: Current employment dates
 ✅ PDF OUTPUT: Professional formatting
 ✅ ALL 24 COUNTRIES: Complete global support
-✅ VERIFICATION READY: Perfect for SheerID verification
+✅ VERIFICATION READY: Perfect for employment verification
 """
 
 import sys
@@ -56,346 +57,370 @@ COUNTRY_CONFIG = {
         'name': 'United States',
         'code': 'us',
         'locale': 'en_US',
-        'collegeFile': 'sheerid_us.json',
+        'schoolFile': 'schools_us.json',
         'currency': 'USD',
         'currency_symbol': '$',
-        'academic_terms': ['Fall 2024', 'Spring 2025', 'Summer 2024'],
+        'salary_range': (40000, 80000),
+        'bonus_range': (2000, 10000),
         'flag': '🇺🇸',
         'time_format': 'AM/PM',
         'date_format': '%B %d, %Y',
-        'tuition_range': (1500, 5000),
-        'fees_range': (200, 800)
+        'contract_types': ['Full-Time Permanent', 'Full-Time Contract', 'Part-Time'],
+        'departments': ['Mathematics', 'Science', 'English', 'History', 'Physical Education', 'Arts', 'Special Education']
     },
     'CA': {
         'name': 'Canada',
         'code': 'ca',
         'locale': 'en_CA',
-        'collegeFile': 'sheerid_ca.json',
+        'schoolFile': 'schools_ca.json',
         'currency': 'CAD',
         'currency_symbol': '$',
-        'academic_terms': ['Fall 2024', 'Winter 2025', 'Summer 2024'],
+        'salary_range': (45000, 85000),
+        'bonus_range': (2500, 12000),
         'flag': '🇨🇦',
         'time_format': 'AM/PM',
         'date_format': '%B %d, %Y',
-        'tuition_range': (2000, 6000),
-        'fees_range': (250, 900)
+        'contract_types': ['Full-Time Permanent', 'Full-Time Contract', 'Part-Time'],
+        'departments': ['Mathematics', 'Science', 'English', 'History', 'Physical Education', 'Arts', 'French']
     },
     'GB': {
         'name': 'United Kingdom',
         'code': 'gb',
         'locale': 'en_GB',
-        'collegeFile': 'sheerid_gb.json',
+        'schoolFile': 'schools_gb.json',
         'currency': 'GBP',
         'currency_symbol': '£',
-        'academic_terms': ['Autumn 2024', 'Spring 2025', 'Summer 2024'],
+        'salary_range': (30000, 60000),
+        'bonus_range': (1500, 8000),
         'flag': '🇬🇧',
         'time_format': '24-hour',
         'date_format': '%d %B %Y',
-        'tuition_range': (3000, 8000),
-        'fees_range': (300, 1000)
+        'contract_types': ['Full-Time Permanent', 'Full-Time Contract', 'Part-Time'],
+        'departments': ['Mathematics', 'Science', 'English', 'History', 'Physical Education', 'Arts']
     },
     'IN': {
         'name': 'India',
         'code': 'in',
         'locale': 'en_IN',
-        'collegeFile': 'sheerid_in.json',
+        'schoolFile': 'schools_in.json',
         'currency': 'INR',
         'currency_symbol': '₹',
-        'academic_terms': ['Monsoon 2024', 'Winter 2025', 'Summer 2024'],
+        'salary_range': (300000, 800000),
+        'bonus_range': (20000, 100000),
         'flag': '🇮🇳',
         'time_format': 'AM/PM',
         'date_format': '%d %B %Y',
-        'tuition_range': (50000, 200000),
-        'fees_range': (5000, 20000)
+        'contract_types': ['Regular', 'Contract', 'Visiting'],
+        'departments': ['Mathematics', 'Science', 'English', 'Social Studies', 'Physical Education', 'Arts']
     },
     'ID': {
         'name': 'Indonesia',
         'code': 'id',
         'locale': 'id_ID',
-        'collegeFile': 'sheerid_id.json',
+        'schoolFile': 'schools_id.json',
         'currency': 'IDR',
         'currency_symbol': 'Rp',
-        'academic_terms': ['First Semester 2024', 'Second Semester 2025', 'Summer 2024'],
+        'salary_range': (60000000, 180000000),
+        'bonus_range': (5000000, 30000000),
         'flag': '🇮🇩',
         'time_format': '24-hour',
         'date_format': '%d %B %Y',
-        'tuition_range': (10000000, 30000000),
-        'fees_range': (500000, 2000000)
+        'contract_types': ['Pegawai Negeri', 'Guru Honorer', 'Guru Kontrak'],
+        'departments': ['Matematika', 'IPA', 'Bahasa Indonesia', 'IPS', 'Pendidikan Jasmani', 'Seni']
     },
     'AU': {
         'name': 'Australia',
         'code': 'au',
         'locale': 'en_AU',
-        'collegeFile': 'sheerid_au.json',
+        'schoolFile': 'schools_au.json',
         'currency': 'AUD',
         'currency_symbol': '$',
-        'academic_terms': ['Semester 1 2024', 'Semester 2 2025', 'Summer 2024'],
+        'salary_range': (60000, 100000),
+        'bonus_range': (3000, 15000),
         'flag': '🇦🇺',
         'time_format': 'AM/PM',
         'date_format': '%d/%m/%Y',
-        'tuition_range': (4000, 10000),
-        'fees_range': (400, 1200)
+        'contract_types': ['Full-Time Ongoing', 'Full-Time Fixed Term', 'Part-Time'],
+        'departments': ['Mathematics', 'Science', 'English', 'Humanities', 'Physical Education', 'Arts']
     },
     'DE': {
         'name': 'Germany',
         'code': 'de',
         'locale': 'de_DE',
-        'collegeFile': 'sheerid_de.json',
+        'schoolFile': 'schools_de.json',
         'currency': 'EUR',
         'currency_symbol': '€',
-        'academic_terms': ['Wintersemester 2024', 'Sommersemester 2025'],
+        'salary_range': (45000, 75000),
+        'bonus_range': (2000, 10000),
         'flag': '🇩🇪',
         'time_format': '24-hour',
         'date_format': '%d.%m.%Y',
-        'tuition_range': (1000, 3000),
-        'fees_range': (200, 600)
+        'contract_types': ['Beamter', 'Angestellter', 'Teilzeit'],
+        'departments': ['Mathematik', 'Naturwissenschaften', 'Deutsch', 'Geschichte', 'Sport', 'Kunst']
     },
     'FR': {
         'name': 'France',
         'code': 'fr',
         'locale': 'fr_FR',
-        'collegeFile': 'sheerid_fr.json',
+        'schoolFile': 'schools_fr.json',
         'currency': 'EUR',
         'currency_symbol': '€',
-        'academic_terms': ['Semestre 1 2024', 'Semestre 2 2025'],
+        'salary_range': (35000, 65000),
+        'bonus_range': (1500, 8000),
         'flag': '🇫🇷',
         'time_format': '24-hour',
         'date_format': '%d/%m/%Y',
-        'tuition_range': (1000, 4000),
-        'fees_range': (200, 700)
+        'contract_types': ['Titulaire', 'Contractuel', 'Temps Partiel'],
+        'departments': ['Mathématiques', 'Sciences', 'Français', 'Histoire', 'Éducation Physique', 'Arts']
     },
     'ES': {
         'name': 'Spain',
         'code': 'es',
         'locale': 'es_ES',
-        'collegeFile': 'sheerid_es.json',
+        'schoolFile': 'schools_es.json',
         'currency': 'EUR',
         'currency_symbol': '€',
-        'academic_terms': ['Primer Semestre 2024', 'Segundo Semestre 2025'],
+        'salary_range': (30000, 55000),
+        'bonus_range': (1000, 7000),
         'flag': '🇪🇸',
         'time_format': '24-hour',
         'date_format': '%d/%m/%Y',
-        'tuition_range': (1500, 4500),
-        'fees_range': (250, 800)
+        'contract_types': ['Funcionario', 'Interino', 'Tiempo Parcial'],
+        'departments': ['Matemáticas', 'Ciencias', 'Lengua', 'Historia', 'Educación Física', 'Arte']
     },
     'IT': {
         'name': 'Italy',
         'code': 'it',
         'locale': 'it_IT',
-        'collegeFile': 'sheerid_it.json',
+        'schoolFile': 'schools_it.json',
         'currency': 'EUR',
         'currency_symbol': '€',
-        'academic_terms': ['Primo Semestre 2024', 'Secondo Semestre 2025'],
+        'salary_range': (32000, 58000),
+        'bonus_range': (1200, 7500),
         'flag': '🇮🇹',
         'time_format': '24-hour',
         'date_format': '%d/%m/%Y',
-        'tuition_range': (1200, 4000),
-        'fees_range': (200, 700)
+        'contract_types': ['Di Ruolo', 'Precario', 'Part-Time'],
+        'departments': ['Matematica', 'Scienze', 'Italiano', 'Storia', 'Educazione Fisica', 'Arte']
     },
     'BR': {
         'name': 'Brazil',
         'code': 'br',
         'locale': 'pt_BR',
-        'collegeFile': 'sheerid_br.json',
+        'schoolFile': 'schools_br.json',
         'currency': 'BRL',
         'currency_symbol': 'R$',
-        'academic_terms': ['Semestre 1 2024', 'Semestre 2 2025'],
+        'salary_range': (40000, 80000),
+        'bonus_range': (3000, 15000),
         'flag': '🇧🇷',
         'time_format': '24-hour',
         'date_format': '%d/%m/%Y',
-        'tuition_range': (3000, 8000),
-        'fees_range': (400, 1200)
+        'contract_types': ['Efetivo', 'Contratado', 'Tempo Parcial'],
+        'departments': ['Matemática', 'Ciências', 'Português', 'História', 'Educação Física', 'Artes']
     },
     'MX': {
         'name': 'Mexico',
         'code': 'mx',
         'locale': 'es_MX',
-        'collegeFile': 'sheerid_mx.json',
+        'schoolFile': 'schools_mx.json',
         'currency': 'MXN',
         'currency_symbol': '$',
-        'academic_terms': ['Semestre 1 2024', 'Semestre 2 2025'],
+        'salary_range': (200000, 500000),
+        'bonus_range': (15000, 80000),
         'flag': '🇲🇽',
         'time_format': 'AM/PM',
         'date_format': '%d/%m/%Y',
-        'tuition_range': (20000, 60000),
-        'fees_range': (2000, 8000)
+        'contract_types': ['Base', 'Contrato', 'Medio Tiempo'],
+        'departments': ['Matemáticas', 'Ciencias', 'Español', 'Historia', 'Educación Física', 'Artes']
     },
     'NL': {
         'name': 'Netherlands',
         'code': 'nl',
         'locale': 'nl_NL',
-        'collegeFile': 'sheerid_nl.json',
+        'schoolFile': 'schools_nl.json',
         'currency': 'EUR',
         'currency_symbol': '€',
-        'academic_terms': ['Semester 1 2024', 'Semester 2 2025'],
+        'salary_range': (40000, 70000),
+        'bonus_range': (2000, 12000),
         'flag': '🇳🇱',
         'time_format': '24-hour',
         'date_format': '%d-%m-%Y',
-        'tuition_range': (2000, 6000),
-        'fees_range': (300, 900)
+        'contract_types': ['Vast', 'Tijdelijk', 'Parttime'],
+        'departments': ['Wiskunde', 'Natuurkunde', 'Nederlands', 'Geschiedenis', 'Lichamelijke Opvoeding', 'Kunst']
     },
     'SE': {
         'name': 'Sweden',
         'code': 'se',
         'locale': 'sv_SE',
-        'collegeFile': 'sheerid_se.json',
+        'schoolFile': 'schools_se.json',
         'currency': 'SEK',
         'currency_symbol': 'kr',
-        'academic_terms': ['Hösttermin 2024', 'Vårtermin 2025'],
+        'salary_range': (350000, 600000),
+        'bonus_range': (20000, 100000),
         'flag': '🇸🇪',
         'time_format': '24-hour',
         'date_format': '%Y-%m-%d',
-        'tuition_range': (25000, 70000),
-        'fees_range': (2000, 6000)
+        'contract_types': ['Tillsvidare', 'Tidsbegränsad', 'Deltid'],
+        'departments': ['Matematik', 'Naturvetenskap', 'Svenska', 'Historia', 'Idrott', 'Konst']
     },
     'NO': {
         'name': 'Norway',
         'code': 'no',
         'locale': 'no_NO',
-        'collegeFile': 'sheerid_no.json',
+        'schoolFile': 'schools_no.json',
         'currency': 'NOK',
         'currency_symbol': 'kr',
-        'academic_terms': ['Høstsemester 2024', 'Vårsemester 2025'],
+        'salary_range': (450000, 750000),
+        'bonus_range': (25000, 120000),
         'flag': '🇳🇴',
         'time_format': '24-hour',
         'date_format': '%d.%m.%Y',
-        'tuition_range': (30000, 80000),
-        'fees_range': (2500, 7000)
+        'contract_types': ['Fast', 'Midlertidig', 'Deltid'],
+        'departments': ['Matematikk', 'Naturfag', 'Norsk', 'Historie', 'Kroppsøving', 'Kunst']
     },
     'DK': {
         'name': 'Denmark',
         'code': 'dk',
         'locale': 'da_DK',
-        'collegeFile': 'sheerid_dk.json',
+        'schoolFile': 'schools_dk.json',
         'currency': 'DKK',
         'currency_symbol': 'kr',
-        'academic_terms': ['Efterårssemester 2024', 'Forårssemester 2025'],
+        'salary_range': (380000, 650000),
+        'bonus_range': (22000, 110000),
         'flag': '🇩🇰',
         'time_format': '24-hour',
         'date_format': '%d/%m/%Y',
-        'tuition_range': (28000, 75000),
-        'fees_range': (2200, 6500)
+        'contract_types': ['Fast', 'Tidsbegrænset', 'Deltid'],
+        'departments': ['Matematik', 'Naturvidenskab', 'Dansk', 'Historie', 'Idræt', 'Kunst']
     },
     'JP': {
         'name': 'Japan',
         'code': 'jp',
         'locale': 'ja_JP',
-        'collegeFile': 'sheerid_jp.json',
+        'schoolFile': 'schools_jp.json',
         'currency': 'JPY',
         'currency_symbol': '¥',
-        'academic_terms': ['Spring 2024', 'Fall 2024'],
+        'salary_range': (4000000, 7000000),
+        'bonus_range': (200000, 1000000),
         'flag': '🇯🇵',
         'time_format': '24-hour',
         'date_format': '%Y年%m月%d日',
-        'tuition_range': (300000, 800000),
-        'fees_range': (30000, 80000)
+        'contract_types': ['常勤', '契約', 'パートタイム'],
+        'departments': ['数学', '理科', '国語', '社会', '体育', '美術']
     },
     'KR': {
         'name': 'South Korea',
         'code': 'kr',
         'locale': 'ko_KR',
-        'collegeFile': 'sheerid_kr.json',
+        'schoolFile': 'schools_kr.json',
         'currency': 'KRW',
         'currency_symbol': '₩',
-        'academic_terms': ['Spring 2024', 'Fall 2024'],
+        'salary_range': (40000000, 70000000),
+        'bonus_range': (2000000, 10000000),
         'flag': '🇰🇷',
         'time_format': '24-hour',
         'date_format': '%Y년 %m월 %d일',
-        'tuition_range': (3000000, 7000000),
-        'fees_range': (300000, 700000)
+        'contract_types': ['정규직', '계약직', '파트타임'],
+        'departments': ['수학', '과학', '국어', '사회', '체육', '미술']
     },
     'SG': {
         'name': 'Singapore',
         'code': 'sg',
         'locale': 'en_SG',
-        'collegeFile': 'sheerid_sg.json',
+        'schoolFile': 'schools_sg.json',
         'currency': 'SGD',
         'currency_symbol': '$',
-        'academic_terms': ['Semester 1 2024', 'Semester 2 2025'],
+        'salary_range': (50000, 90000),
+        'bonus_range': (3000, 20000),
         'flag': '🇸🇬',
         'time_format': 'AM/PM',
         'date_format': '%d/%m/%Y',
-        'tuition_range': (5000, 12000),
-        'fees_range': (500, 1500)
+        'contract_types': ['Permanent', 'Contract', 'Part-Time'],
+        'departments': ['Mathematics', 'Science', 'English', 'Humanities', 'Physical Education', 'Arts']
     },
     'NZ': {
         'name': 'New Zealand',
         'code': 'nz',
         'locale': 'en_NZ',
-        'collegeFile': 'sheerid_nz.json',
+        'schoolFile': 'schools_nz.json',
         'currency': 'NZD',
         'currency_symbol': '$',
-        'academic_terms': ['Semester 1 2024', 'Semester 2 2025'],
+        'salary_range': (55000, 95000),
+        'bonus_range': (3500, 18000),
         'flag': '🇳🇿',
         'time_format': 'AM/PM',
         'date_format': '%d/%m/%Y',
-        'tuition_range': (4000, 10000),
-        'fees_range': (400, 1200)
+        'contract_types': ['Permanent', 'Fixed Term', 'Part-Time'],
+        'departments': ['Mathematics', 'Science', 'English', 'Social Sciences', 'Physical Education', 'Arts']
     },
     'ZA': {
         'name': 'South Africa',
         'code': 'za',
         'locale': 'en_ZA',
-        'collegeFile': 'sheerid_za.json',
+        'schoolFile': 'schools_za.json',
         'currency': 'ZAR',
         'currency_symbol': 'R',
-        'academic_terms': ['First Semester 2024', 'Second Semester 2025'],
+        'salary_range': (250000, 500000),
+        'bonus_range': (15000, 80000),
         'flag': '🇿🇦',
         'time_format': 'AM/PM',
         'date_format': '%Y/%m/%d',
-        'tuition_range': (25000, 60000),
-        'fees_range': (2500, 6000)
+        'contract_types': ['Permanent', 'Contract', 'Part-Time'],
+        'departments': ['Mathematics', 'Science', 'English', 'Social Studies', 'Physical Education', 'Arts']
     },
     'CN': {
         'name': 'China',
         'code': 'cn',
         'locale': 'zh_CN',
-        'collegeFile': 'sheerid_cn.json',
+        'schoolFile': 'schools_cn.json',
         'currency': 'CNY',
         'currency_symbol': '¥',
-        'academic_terms': ['Spring 2024', 'Fall 2024'],
+        'salary_range': (120000, 300000),
+        'bonus_range': (10000, 50000),
         'flag': '🇨🇳',
         'time_format': '24-hour',
         'date_format': '%Y年%m月%d日',
-        'tuition_range': (15000, 40000),
-        'fees_range': (1500, 4000)
+        'contract_types': ['编制', '合同', '兼职'],
+        'departments': ['数学', '科学', '语文', '历史', '体育', '美术']
     },
     'AE': {
         'name': 'UAE',
         'code': 'ae',
         'locale': 'en_AE',
-        'collegeFile': 'sheerid_ae.json',
+        'schoolFile': 'schools_ae.json',
         'currency': 'AED',
         'currency_symbol': 'د.إ',
-        'academic_terms': ['Fall 2024', 'Spring 2025'],
+        'salary_range': (120000, 250000),
+        'bonus_range': (10000, 50000),
         'flag': '🇦🇪',
         'time_format': 'AM/PM',
         'date_format': '%d/%m/%Y',
-        'tuition_range': (10000, 30000),
-        'fees_range': (1000, 3000)
+        'contract_types': ['Permanent', 'Contract', 'Part-Time'],
+        'departments': ['Mathematics', 'Science', 'English', 'Social Studies', 'Physical Education', 'Arts']
     },
     'PH': {
         'name': 'Philippines',
         'code': 'ph',
         'locale': 'en_PH',
-        'collegeFile': 'sheerid_ph.json',
+        'schoolFile': 'schools_ph.json',
         'currency': 'PHP',
         'currency_symbol': '₱',
-        'academic_terms': ['First Semester 2025-2026', 'Second Semester 2026-2027', 'Summer 2026'],
+        'salary_range': (300000, 600000),
+        'bonus_range': (20000, 100000),
         'flag': '🇵🇭',
         'time_format': 'AM/PM',
         'date_format': '%B %d, %Y',
-        'tuition_range': (40000, 100000),
-        'fees_range': (4000, 10000)
+        'contract_types': ['Regular', 'Contractual', 'Part-Time'],
+        'departments': ['Mathematics', 'Science', 'English', 'Social Studies', 'Physical Education', 'Arts']
     }
 }
 
-class ProfessionalReceiptGenerator:
+class ProfessionalEmploymentDocumentGenerator:
     def __init__(self):
-        self.receipts_dir = "receipts"
-        self.students_file = "students.txt"
+        self.documents_dir = "employment_docs"
+        self.employees_file = "employees.txt"
         self.selected_country = None
-        self.all_colleges = []
+        self.all_schools = []
         
         self.faker_instances = []
         self.faker_lock = threading.Lock()
@@ -406,12 +431,12 @@ class ProfessionalReceiptGenerator:
         self.memory_cleanup_interval = 100
         
         self.stats = {
-            "receipts_generated": 0,
-            "students_saved": 0,
+            "documents_generated": 0,
+            "employees_saved": 0,
             "start_time": None
         }
         
-        # Professional color scheme for receipts
+        # Professional color scheme for documents
         self.colors = {
             "primary": colors.HexColor("#1e3a8a"),
             "secondary": colors.HexColor("#2563eb"),
@@ -425,80 +450,84 @@ class ProfessionalReceiptGenerator:
             "white": colors.white,
             "border": colors.HexColor("#d1d5db"),
             "row_even": colors.white,
-            "row_odd": colors.HexColor("#f3f4f6")
+            "row_odd": colors.HexColor("#f3f4f6"),
+            "paystub_green": colors.HexColor("#065f46"),
+            "paystub_light": colors.HexColor("#d1fae5")
         }
 
         self.create_directories()
         self.clear_all_data()
 
     def create_directories(self):
-        os.makedirs(self.receipts_dir, exist_ok=True)
+        os.makedirs(self.documents_dir, exist_ok=True)
 
     def clear_all_data(self):
         try:
-            if os.path.exists(self.receipts_dir):
-                for f in os.listdir(self.receipts_dir):
+            if os.path.exists(self.documents_dir):
+                for f in os.listdir(self.documents_dir):
                     if f.endswith(('.pdf', '.txt')):
                         try:
-                            os.remove(os.path.join(self.receipts_dir, f))
+                            os.remove(os.path.join(self.documents_dir, f))
                         except Exception:
                             pass
-            if os.path.exists(self.students_file):
+            if os.path.exists(self.employees_file):
                 try:
-                    os.remove(self.students_file)
+                    os.remove(self.employees_file)
                 except Exception:
                     pass
             
             print("🗑️  All previous data cleared!")
-            print("✅ PERFECT FORMAT: Professional receipt layout")
-            print("✅ INSTANT APPROVAL: Super-fast verification system") 
+            print("✅ EMPLOYMENT VERIFICATION: Professional verification letter") 
+            print("✅ EMPLOYMENT CONTRACT: Official school employment contract")
+            print("✅ EMPLOYEE PAY STUB: Detailed salary payment stub")
             print("✅ INSTITUTION: Full school name from JSON only")
-            print("✅ STUDENT INFO: Name, ID, Program, Semester")
-            print("✅ HARDCODED DATES: Current/upcoming term dates")
+            print("✅ EMPLOYEE INFO: Name, ID, Position, Department, Salary")
+            print("✅ CURRENT DATES: Valid employment dates")
             print("✅ ALL 24 COUNTRIES: Complete global support")
             print("="*70)
         except Exception as e:
             print(f"⚠️  Warning: {e}")
 
-    def load_colleges(self):
-        """Load colleges ONLY from JSON file - no hardcoded data."""
+    def load_schools(self):
+        """Load schools ONLY from JSON file - no hardcoded data."""
         try:
             if not self.selected_country:
                 return []
             
             config = COUNTRY_CONFIG[self.selected_country]
-            college_file = config['collegeFile']
+            school_file = config['schoolFile']
             
-            print(f"📚 Loading {college_file}...")
+            print(f"📚 Loading {school_file}...")
             
-            if not os.path.exists(college_file):
-                print(f"❌ College file {college_file} not found!")
+            if not os.path.exists(school_file):
+                print(f"❌ School file {school_file} not found!")
                 return []
             
-            with open(college_file, 'r', encoding='utf-8') as f:
+            with open(school_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            colleges = []
-            for c in data:
-                if c.get('name') and c.get('id'):
-                    colleges.append({
-                        'name': c['name'],
-                        'id': c['id'],
-                        'type': c.get('type', 'UNIVERSITY')
+            schools = []
+            for s in data:
+                if s.get('name') and s.get('id'):
+                    schools.append({
+                        'name': s['name'],
+                        'id': s['id'],
+                        'type': s.get('type', 'SCHOOL')
                     })
             
-            print(f"✅ Loaded {len(colleges)} colleges from {college_file}")
-            return colleges
+            print(f"✅ Loaded {len(schools)} schools from {school_file}")
+            return schools
             
         except Exception as e:
-            print(f"❌ ERROR loading colleges from {college_file}: {e}")
+            print(f"❌ ERROR loading schools from {school_file}: {e}")
             return []
 
-    def get_country_colleges(self, country_code):
+    def get_country_schools(self, country_code):
         """ONLY used as fallback if JSON file is completely missing."""
-        print(f"⚠️  No colleges loaded from JSON, using minimal fallback")
+        print(f"⚠️  No schools loaded from JSON, using minimal fallback")
         return [
-            {'name': f'University of {COUNTRY_CONFIG[country_code]["name"]}', 'id': f'UNI001', 'type': 'UNIVERSITY'}
+            {'name': f'{COUNTRY_CONFIG[country_code]["name"]} High School', 'id': f'SCH001', 'type': 'HIGH_SCHOOL'},
+            {'name': f'{COUNTRY_CONFIG[country_code]["name"]} Elementary School', 'id': f'SCH002', 'type': 'ELEMENTARY'}
         ]
 
     def select_country_and_load(self):
@@ -533,11 +562,11 @@ class ProfessionalReceiptGenerator:
         config = COUNTRY_CONFIG[self.selected_country]
         print(f"\n✅ Selected: {config['flag']} {config['name']} ({self.selected_country})")
         
-        self.all_colleges = self.load_colleges()
+        self.all_schools = self.load_schools()
         
-        if not self.all_colleges:
-            print("❌ No colleges loaded from JSON! Using minimal fallback.")
-            self.all_colleges = self.get_country_colleges(self.selected_country)
+        if not self.all_schools:
+            print("❌ No schools loaded from JSON! Using minimal fallback.")
+            self.all_schools = self.get_country_schools(self.selected_country)
         
         # Initialize Faker instances with English names
         try:
@@ -556,130 +585,139 @@ class ProfessionalReceiptGenerator:
             self.faker_index = (self.faker_index + 1) % len(self.faker_instances)
             return faker
 
-    def select_random_college(self):
-        """Select a random college from JSON data only."""
-        if not self.all_colleges:
+    def select_random_school(self):
+        """Select a random school from JSON data only."""
+        if not self.all_schools:
             config = COUNTRY_CONFIG.get(self.selected_country, COUNTRY_CONFIG['US'])
-            return {'name': f'University of {config["name"]}', 'id': 'UNI001', 'type': 'UNIVERSITY'}
-        return random.choice(self.all_colleges)
+            return {'name': f'{config["name"]} School District', 'id': 'SCH001', 'type': 'SCHOOL'}
+        return random.choice(self.all_schools)
 
-    def generate_payment_data(self, country_config):
-        """Generate realistic payment data for tuition receipt."""
-        tuition_min, tuition_max = country_config['tuition_range']
-        fees_min, fees_max = country_config['fees_range']
+    def generate_salary_data(self, country_config):
+        """Generate realistic salary data for employment documents."""
+        salary_min, salary_max = country_config['salary_range']
+        bonus_min, bonus_max = country_config['bonus_range']
         
-        tuition_amount = random.randint(tuition_min, tuition_max)
-        fees_amount = random.randint(fees_min, fees_max)
-        total_amount = tuition_amount + fees_amount
+        annual_salary = random.randint(salary_min, salary_max)
+        monthly_salary = annual_salary / 12
+        bonus_amount = random.randint(bonus_min, bonus_max)
         
-        payment_methods = ["Credit Card", "Bank Transfer", "Online Payment", "Scholarship", "Financial Aid"]
-        transaction_id = f"TX{random.randint(100000, 999999)}"
+        # Deductions
+        tax_rate = random.uniform(0.20, 0.35)
+        tax_amount = monthly_salary * tax_rate
+        insurance = monthly_salary * 0.05
+        retirement = monthly_salary * 0.03
+        total_deductions = tax_amount + insurance + retirement
+        net_pay = monthly_salary - total_deductions
+        
+        # Generate payment dates
+        payment_date = datetime.now() - timedelta(days=random.randint(1, 30))
+        pay_period_start = payment_date - timedelta(days=30)
+        pay_period_end = payment_date - timedelta(days=1)
         
         return {
-            "tuition_amount": tuition_amount,
-            "fees_amount": fees_amount,
-            "total_amount": total_amount,
-            "payment_method": random.choice(payment_methods),
-            "transaction_id": transaction_id,
-            "payment_date": datetime.now() - timedelta(days=random.randint(1, 30))
+            "annual_salary": annual_salary,
+            "monthly_salary": monthly_salary,
+            "bonus_amount": bonus_amount,
+            "tax_amount": tax_amount,
+            "insurance": insurance,
+            "retirement": retirement,
+            "total_deductions": total_deductions,
+            "net_pay": net_pay,
+            "payment_date": payment_date,
+            "pay_period_start": pay_period_start,
+            "pay_period_end": pay_period_end,
+            "payment_method": random.choice(["Direct Deposit", "Bank Transfer", "Check"]),
+            "transaction_id": f"PAY{random.randint(100000, 999999)}"
         }
 
-    def generate_student_data(self, college):
-        """Generate student data with CURRENT/UPCOMING term dates."""
+    def generate_employee_data(self, school):
+        """Generate employee data with CURRENT employment dates."""
         fake = self.get_faker()
         config = COUNTRY_CONFIG[self.selected_country]
         
         first_name = fake.first_name()
         last_name = fake.last_name()
         full_name = clean_name(f"{first_name} {last_name}")
-        student_id = f"{fake.random_number(digits=8, fix_len=True)}"
+        employee_id = f"EMP{fake.random_number(digits=6, fix_len=True)}"
         
-        # CURRENT/UPCOMING TERM DATES for SheerID verification
+        # CURRENT EMPLOYMENT DATES for verification
         current_date = datetime.now()
         
-        # Generate dates for current or upcoming semester
-        if current_date.month in [1, 2, 3, 4, 5]:  # Spring semester
-            date_issued = current_date
-            first_day = datetime(current_date.year, 1, 15)
-            last_day = datetime(current_date.year, 5, 15)
-            exam_week = datetime(current_date.year, 5, 20)
-            academic_term = "Spring 2025"
-        else:  # Fall semester  
-            date_issued = current_date
-            first_day = datetime(current_date.year, 8, 25)
-            last_day = datetime(current_date.year, 12, 15)
-            exam_week = datetime(current_date.year, 12, 20)
-            academic_term = "Fall 2025"
+        # Generate employment dates (hired 1-5 years ago)
+        years_employed = random.randint(1, 5)
+        hire_date = current_date - timedelta(days=365 * years_employed + random.randint(0, 364))
         
-        # Country-specific programs
-        programs_by_country = {
-            'US': ["Computer Science", "Business Administration", "Engineering", "Psychology", "Biology"],
-            'GB': ["Computer Science", "Business Studies", "Engineering", "Medicine", "Law"],
-            'IN': ["Computer Science", "Business Administration", "Engineering", "Medicine", "Commerce"],
-            'ID': ["Computer Science", "Business", "Engineering", "Medicine"],
-            'AU': ["Computer Science", "Business", "Engineering", "Health Sciences"],
-            'DE': ["Informatik", "BWL", "Ingenieurwesen", "Medizin"],
-            'FR': ["Informatique", "Commerce", "Ingénierie", "Médecine"],
-            'ES': ["Informática", "Negocios", "Ingeniería", "Medicina"],
-            'IT': ["Informatica", "Economia", "Ingegneria", "Medicina"],
-            'BR': ["Ciência da Computação", "Administração", "Engenharia", "Medicina"],
-            'MX': ["Ciencias de la Computación", "Negocios", "Ingeniería", "Medicina"],
-            'NL': ["Informatica", "Bedrijfskunde", "Techniek", "Geneeskunde"],
-            'SE': ["Datateknik", "Företagsekonomi", "Teknik", "Medicin"],
-            'NO': ["Informatikk", "Bedriftsøkonomi", "Ingeniørvitenskap", "Medisin"],
-            'DK': ["Datalogi", "Erhvervsøkonomi", "Ingeniørvidenskab", "Medicin"],
-            'JP': ["Computer Science", "Business", "Engineering", "Medicine"],
-            'KR': ["Computer Science", "Business", "Engineering", "Medicine"],
-            'SG': ["Computer Science", "Business", "Engineering", "Medicine"],
-            'NZ': ["Computer Science", "Business", "Engineering", "Health Sciences"],
-            'ZA': ["Computer Science", "Business", "Engineering", "Medicine"],
-            'CN': ["Computer Science", "Business", "Engineering", "Medicine"],
-            'AE': ["Computer Science", "Business", "Engineering", "Medicine"],
-            'PH': ["Computer Science", "Business Administration", "Engineering", "Nursing", "Education"],
-            'CA': ["Computer Science", "Business", "Engineering", "Health Sciences"]
+        # Contract end date (if applicable)
+        contract_type = random.choice(config['contract_types'])
+        if "Contract" in contract_type or "Temporary" in contract_type or "Fixed" in contract_type:
+            contract_end = current_date + timedelta(days=random.randint(180, 730))  # 6-24 months
+        else:
+            contract_end = None  # Permanent position
+        
+        # Country-specific positions
+        positions_by_country = {
+            'US': ["Teacher", "Senior Teacher", "Department Head", "Vice Principal", "Principal"],
+            'GB': ["Teacher", "Senior Teacher", "Head of Department", "Deputy Head", "Head Teacher"],
+            'IN': ["Teacher", "Senior Teacher", "Head of Department", "Vice Principal", "Principal"],
+            'ID': ["Guru", "Guru Senior", "Kepala Jurusan", "Wakil Kepala Sekolah", "Kepala Sekolah"],
+            'DE': ["Lehrer", "Oberlehrer", "Fachbereichsleiter", "Konrektor", "Rektor"],
+            'FR': ["Professeur", "Professeur Principal", "Chef de Département", "Principal Adjoint", "Principal"],
+            'ES': ["Profesor", "Profesor Titular", "Jefe de Departamento", "Subdirector", "Director"],
+            'IT': ["Insegnante", "Insegnante Esperto", "Capo Dipartimento", "Vice Preside", "Preside"],
+            'JP': ["教師", "主任教師", "学科主任", "教頭", "校長"],
+            'KR': ["교사", "주임교사", "학과장", "교감", "교장"]
         }
         
-        programs = programs_by_country.get(self.selected_country, ["Computer Science", "Business", "Engineering"])
+        positions = positions_by_country.get(self.selected_country, ["Teacher", "Senior Teacher", "Department Head"])
+        departments = config.get('departments', ["Mathematics", "Science", "English"])
         
-        # Generate payment data
-        payment_data = self.generate_payment_data(config)
+        # Generate salary data
+        salary_data = self.generate_salary_data(config)
         
         return {
             "full_name": full_name,
-            "student_id": student_id,
-            "college": college,
-            "program": random.choice(programs),
-            "academic_term": academic_term,
-            "date_issued": date_issued,
-            "first_day": first_day,
-            "last_day": last_day,
-            "exam_week": exam_week,
+            "employee_id": employee_id,
+            "school": school,
+            "position": random.choice(positions),
+            "department": random.choice(departments),
+            "contract_type": contract_type,
+            "hire_date": hire_date,
+            "contract_end": contract_end,
+            "current_date": current_date,
+            "years_employed": years_employed,
             "country_config": config,
-            "payment_data": payment_data
+            "salary_data": salary_data
         }
 
     def format_currency(self, amount, country_config):
         """Format currency according to country preferences."""
         symbol = country_config['currency_symbol']
-        if country_config['currency'] in ['USD', 'CAD', 'AUD', 'SGD', 'NZD']:
+        currency = country_config['currency']
+        
+        if currency in ['USD', 'CAD', 'AUD', 'SGD', 'NZD']:
             return f"{symbol}{amount:,.2f}"
-        elif country_config['currency'] in ['EUR', 'GBP']:
+        elif currency in ['EUR', 'GBP']:
             return f"{symbol}{amount:,.2f}"
-        elif country_config['currency'] in ['JPY', 'CNY']:
-            return f"{symbol}{amount:,}"
+        elif currency in ['JPY', 'KRW']:
+            return f"{symbol}{amount:,.0f}"
+        elif currency in ['IDR']:
+            return f"{symbol} {amount:,.0f}"
         else:
             return f"{symbol} {amount:,.2f}"
 
-    def create_tuition_receipt_pdf(self, student_data):
-        """Create a professional tuition receipt PDF perfect for SheerID verification."""
-        college = student_data['college']
-        student_id = student_data['student_id']
-        college_id = college['id']
-        config = student_data['country_config']
-        payment_data = student_data['payment_data']
+    def format_date(self, date_obj, country_config):
+        """Format date according to country preferences."""
+        return date_obj.strftime(country_config['date_format'])
 
-        filename = f"TUITION_{student_id}_{college_id}.pdf"
-        filepath = os.path.join(self.receipts_dir, filename)
+    def create_employment_verification_letter(self, employee_data):
+        """Create a professional employment verification letter."""
+        school = employee_data['school']
+        employee_id = employee_data['employee_id']
+        school_id = school['id']
+        config = employee_data['country_config']
+
+        filename = f"VERIFICATION_{employee_id}_{school_id}.pdf"
+        filepath = os.path.join(self.documents_dir, filename)
 
         try:
             # Create PDF document
@@ -696,212 +734,203 @@ class ProfessionalReceiptGenerator:
             elements = []
             styles = getSampleStyleSheet()
             
-            # Header with institution name
+            # School Letterhead
             header_style = ParagraphStyle(
                 'HeaderStyle',
                 parent=styles['Heading1'],
-                fontSize=20,
+                fontSize=18,
                 textColor=self.colors['primary'],
-                alignment=1,
-                spaceAfter=10
-            )
-            
-            header = Paragraph("OFFICIAL TUITION RECEIPT", header_style)
-            elements.append(header)
-            
-            # Institution Name (from JSON only)
-            uni_style = ParagraphStyle(
-                'UniversityStyle',
-                parent=styles['Heading2'],
-                fontSize=16,
-                textColor=self.colors['secondary'],
-                alignment=1,
+                alignment=0,
                 spaceAfter=20
             )
             
-            university = Paragraph(college['name'], uni_style)
-            elements.append(university)
+            header = Paragraph(school['name'], header_style)
+            elements.append(header)
             
-            elements.append(Spacer(1, 15))
-            
-            # Receipt Information
-            receipt_style = ParagraphStyle(
-                'ReceiptStyle',
+            # Address line
+            address_style = ParagraphStyle(
+                'AddressStyle',
                 parent=styles['Normal'],
                 fontSize=10,
                 textColor=self.colors['text_light'],
-                alignment=1,
+                alignment=0,
                 spaceAfter=15
             )
             
-            receipt_info = Paragraph(f"Receipt Date: {self.format_date(student_data['date_issued'], config)} | Transaction ID: {payment_data['transaction_id']}", receipt_style)
-            elements.append(receipt_info)
+            fake = self.get_faker()
+            address = Paragraph(f"{fake.street_address()} • {fake.city()} • {fake.postcode()} • {config['name']}", address_style)
+            elements.append(address)
             
-            # Student Information Section
-            student_info_style = ParagraphStyle(
-                'StudentInfoTitle',
-                parent=styles['Heading2'],
-                fontSize=14,
-                textColor=self.colors['primary'],
-                spaceAfter=8
+            elements.append(Spacer(1, 30))
+            
+            # Date
+            date_style = ParagraphStyle(
+                'DateStyle',
+                parent=styles['Normal'],
+                fontSize=11,
+                textColor=self.colors['text_dark'],
+                alignment=0,
+                spaceAfter=20
             )
             
-            student_info_title = Paragraph("Student Information", student_info_style)
-            elements.append(student_info_title)
+            current_date = self.format_date(employee_data['current_date'], config)
+            date_line = Paragraph(current_date, date_style)
+            elements.append(date_line)
             
-            # Student Info Table
-            student_data_table = [
-                ["Full Name:", student_data["full_name"]],
-                ["Student ID:", student_data["student_id"]],
-                ["Academic Program:", student_data["program"]],
-                ["Current Semester:", student_data["academic_term"]],
-                ["Enrollment Status:", "Full-Time Active"]
-            ]
+            elements.append(Spacer(1, 20))
             
-            student_table = Table(student_data_table, colWidths=[2*inch, 4*inch])
-            student_table.setStyle(TableStyle([
-                ('FONT', (0, 0), (-1, -1), 'Helvetica', 11),
-                ('BACKGROUND', (0, 0), (0, -1), self.colors['row_odd']),
-                ('BACKGROUND', (1, 0), (1, -1), colors.white),
-                ('TEXTCOLOR', (0, 0), (-1, -1), self.colors['text_dark']),
-                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-                ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('LINEBELOW', (0, 0), (-1, -1), 1, self.colors['border']),
-                ('BOX', (0, 0), (-1, -1), 1, self.colors['border']),
-                ('PADDING', (0, 0), (-1, -1), 8),
-            ]))
+            # Title
+            title_style = ParagraphStyle(
+                'TitleStyle',
+                parent=styles['Heading2'],
+                fontSize=16,
+                textColor=self.colors['primary'],
+                alignment=0,
+                spaceAfter=20
+            )
             
-            elements.append(student_table)
-            elements.append(Spacer(1, 15))
+            title = Paragraph("EMPLOYMENT VERIFICATION LETTER", title_style)
+            elements.append(title)
             
-            # Payment Details Section
-            payment_title = Paragraph("Payment Details", student_info_style)
-            elements.append(payment_title)
+            # To Whom It May Concern
+            to_style = ParagraphStyle(
+                'ToStyle',
+                parent=styles['Normal'],
+                fontSize=11,
+                textColor=self.colors['text_dark'],
+                alignment=0,
+                spaceAfter=20
+            )
             
-            payment_details = [
-                ["Description", "Amount"],
-                ["Tuition Fee", self.format_currency(payment_data['tuition_amount'], config)],
-                ["University Fees", self.format_currency(payment_data['fees_amount'], config)],
-                ["", ""],
-                ["TOTAL PAID", self.format_currency(payment_data['total_amount'], config)]
-            ]
+            to_line = Paragraph("To Whom It May Concern,", to_style)
+            elements.append(to_line)
             
-            payment_table = Table(payment_details, colWidths=[4*inch, 2*inch])
-            payment_table.setStyle(TableStyle([
-                # Header
-                ('BACKGROUND', (0, 0), (-1, 0), self.colors['primary']),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 12),
-                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-                
-                # Data rows
-                ('FONT', (0, 1), (-1, -2), 'Helvetica', 11),
-                ('FONT', (0, -1), (-1, -1), 'Helvetica-Bold', 12),
-                ('TEXTCOLOR', (0, 1), (-1, -1), self.colors['text_dark']),
-                ('ALIGN', (0, 1), (0, -1), 'LEFT'),
-                ('ALIGN', (1, 1), (1, -1), 'RIGHT'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                
-                # Grid and styling
-                ('LINEABOVE', (0, -1), (-1, -1), 2, self.colors['accent']),
-                ('BACKGROUND', (0, -1), (-1, -1), self.colors['success']),
-                ('TEXTCOLOR', (0, -1), (-1, -1), colors.white),
-                ('LINEBELOW', (0, 0), (-1, -2), 0.5, self.colors['border']),
-                ('BOX', (0, 0), (-1, -1), 1, self.colors['border']),
-                ('PADDING', (0, 0), (-1, -1), 10),
-            ]))
+            # Body text
+            body_style = ParagraphStyle(
+                'BodyStyle',
+                parent=styles['Normal'],
+                fontSize=11,
+                textColor=self.colors['text_dark'],
+                alignment=4,  # Justify
+                spaceAfter=10,
+                leading=14
+            )
             
-            elements.append(payment_table)
-            elements.append(Spacer(1, 10))
+            # Generate letter content
+            hire_date = self.format_date(employee_data['hire_date'], config)
+            annual_salary = self.format_currency(employee_data['salary_data']['annual_salary'], config)
             
-            # Payment Method
-            payment_method_style = ParagraphStyle(
-                'PaymentMethod',
+            body_text = f"""
+            This letter serves to verify that <b>{employee_data['full_name']}</b> (Employee ID: {employee_id}) 
+            has been employed as a <b>{employee_data['position']}</b> in the <b>{employee_data['department']}</b> 
+            Department at <b>{school['name']}</b> since <b>{hire_date}</b>.
+            
+            During their employment, {employee_data['full_name'].split()[0]} has demonstrated exceptional 
+            professionalism and dedication to their role. They are currently employed on a 
+            <b>{employee_data['contract_type']}</b> basis and their annual salary is <b>{annual_salary}</b>.
+            
+            {employee_data['full_name'].split()[0]}'s responsibilities include curriculum development, 
+            classroom instruction, student assessment, and participation in departmental meetings 
+            and professional development activities.
+            
+            Their employment status with our institution is <b>ACTIVE</b> and in good standing. 
+            {employee_data['full_name'].split()[0]} has consistently met all performance expectations 
+            and has been a valuable member of our educational team.
+            """
+            
+            body = Paragraph(body_text, body_style)
+            elements.append(body)
+            
+            elements.append(Spacer(1, 20))
+            
+            # Sincerely section
+            sincerely_style = ParagraphStyle(
+                'SincerelyStyle',
+                parent=styles['Normal'],
+                fontSize=11,
+                textColor=self.colors['text_dark'],
+                alignment=0,
+                spaceAfter=5
+            )
+            
+            sincerely = Paragraph("Sincerely,", sincerely_style)
+            elements.append(sincerely)
+            
+            elements.append(Spacer(1, 30))
+            
+            # Signature section
+            signature_style = ParagraphStyle(
+                'SignatureStyle',
+                parent=styles['Normal'],
+                fontSize=11,
+                textColor=self.colors['primary'],
+                alignment=0,
+                spaceAfter=5
+            )
+            
+            principal_names = ["Dr. Robert Johnson", "Ms. Sarah Williams", "Mr. Michael Brown", 
+                             "Dr. Jennifer Davis", "Mr. James Wilson", "Ms. Patricia Miller"]
+            signature = Paragraph(random.choice(principal_names), signature_style)
+            elements.append(signature)
+            
+            position_style = ParagraphStyle(
+                'PositionStyle',
                 parent=styles['Normal'],
                 fontSize=10,
                 textColor=self.colors['text_light'],
                 alignment=0
             )
             
-            payment_method = Paragraph(f"Payment Method: {payment_data['payment_method']} | Paid on: {self.format_date(payment_data['payment_date'], config)}", payment_method_style)
-            elements.append(payment_method)
+            position = Paragraph("Principal / Head of School", position_style)
+            elements.append(position)
             
-            elements.append(Spacer(1, 15))
+            elements.append(Spacer(1, 10))
             
-            # Semester Dates
-            dates_title = Paragraph("Semester Information", student_info_style)
-            elements.append(dates_title)
-            
-            dates_data = [
-                ["First Day of Classes:", self.format_date(student_data["first_day"], config)],
-                ["Last Day of Classes:", self.format_date(student_data["last_day"], config)],
-                ["Final Exams:", self.format_date(student_data["exam_week"], config)]
-            ]
-            
-            dates_table = Table(dates_data, colWidths=[2.5*inch, 3.5*inch])
-            dates_table.setStyle(TableStyle([
-                ('FONT', (0, 0), (-1, -1), 'Helvetica', 11),
-                ('BACKGROUND', (0, 0), (0, -1), self.colors['row_odd']),
-                ('BACKGROUND', (1, 0), (1, -1), colors.white),
-                ('TEXTCOLOR', (0, 0), (-1, -1), self.colors['text_dark']),
-                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-                ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('LINEBELOW', (0, 0), (-1, -1), 1, self.colors['border']),
-                ('BOX', (0, 0), (-1, -1), 1, self.colors['border']),
-                ('PADDING', (0, 0), (-1, -1), 8),
-            ]))
-            
-            elements.append(dates_table)
-            elements.append(Spacer(1, 20))
-            
-            # Verification QR Code (placeholder text)
-            verification_style = ParagraphStyle(
-                'VerificationStyle',
+            # Contact information
+            contact_style = ParagraphStyle(
+                'ContactStyle',
                 parent=styles['Normal'],
                 fontSize=9,
                 textColor=self.colors['text_light'],
-                alignment=1,
-                spaceBefore=10
+                alignment=0
             )
             
-            verification = Paragraph(
-                f"VERIFIED | {college['name']} | Student Status: ACTIVE | This receipt is valid for student verification purposes.",
-                verification_style
-            )
-            elements.append(verification)
+            contact = Paragraph(f"{school['name']} • Tel: {fake.phone_number()} • Email: hr@{school['name'].lower().replace(' ', '')}.edu", contact_style)
+            elements.append(contact)
             
-            # Official Stamp
-            stamp_style = ParagraphStyle(
-                'StampStyle',
+            # Footer
+            footer_style = ParagraphStyle(
+                'FooterStyle',
                 parent=styles['Normal'],
                 fontSize=8,
-                textColor=self.colors['accent'],
+                textColor=self.colors['text_light'],
                 alignment=1,
-                spaceBefore=5
+                spaceBefore=30
             )
             
-            stamp = Paragraph("OFFICIAL UNIVERSITY RECEIPT • VALID FOR VERIFICATION", stamp_style)
-            elements.append(stamp)
+            footer = Paragraph(
+                f"Official Verification Letter • {school['name']} • {current_date} • Valid for employment verification purposes",
+                footer_style
+            )
+            elements.append(footer)
             
             # Build PDF
             doc.build(elements)
-            return filename, student_data
-
+            return filename, employee_data
+            
         except Exception as e:
-            logger.error(f"Failed to create PDF receipt {filename}: {e}")
-            return None, student_data
+            logger.error(f"Failed to create verification letter {filename}: {e}")
+            return None, employee_data
 
-    def create_class_schedule_pdf(self, student_data):
-        """Create a professional class schedule PDF perfect for SheerID verification."""
-        college = student_data['college']
-        student_id = student_data['student_id']
-        college_id = college['id']
-        config = student_data['country_config']
+    def create_employment_contract(self, employee_data):
+        """Create a professional employment contract."""
+        school = employee_data['school']
+        employee_id = employee_data['employee_id']
+        school_id = school['id']
+        config = employee_data['country_config']
 
-        filename = f"SCHEDULE_{student_id}_{college_id}.pdf"
-        filepath = os.path.join(self.receipts_dir, filename)
+        filename = f"CONTRACT_{employee_id}_{school_id}.pdf"
+        filepath = os.path.join(self.documents_dir, filename)
 
         try:
             # Create PDF document
@@ -928,45 +957,63 @@ class ProfessionalReceiptGenerator:
                 spaceAfter=10
             )
             
-            header = Paragraph("OFFICIAL CLASS SCHEDULE", header_style)
+            header = Paragraph("EMPLOYMENT CONTRACT", header_style)
             elements.append(header)
             
-            # Institution Name
-            uni_style = ParagraphStyle(
-                'UniversityStyle',
+            # School Name
+            school_style = ParagraphStyle(
+                'SchoolStyle',
                 parent=styles['Heading2'],
                 fontSize=16,
                 textColor=self.colors['secondary'],
                 alignment=1,
+                spaceAfter=20
+            )
+            
+            school_name = Paragraph(school['name'], school_style)
+            elements.append(school_name)
+            
+            elements.append(Spacer(1, 15))
+            
+            # Contract Information
+            contract_info_style = ParagraphStyle(
+                'ContractInfoStyle',
+                parent=styles['Normal'],
+                fontSize=10,
+                textColor=self.colors['text_light'],
+                alignment=1,
                 spaceAfter=15
             )
             
-            university = Paragraph(college['name'], uni_style)
-            elements.append(university)
+            contract_id = f"CON{random.randint(10000, 99999)}"
+            contract_info = Paragraph(f"Contract ID: {contract_id} • Effective Date: {self.format_date(employee_data['hire_date'], config)}", contract_info_style)
+            elements.append(contract_info)
             
-            elements.append(Spacer(1, 10))
-            
-            # Student Information
-            student_info_style = ParagraphStyle(
-                'StudentInfoTitle',
+            # Parties Section
+            parties_title_style = ParagraphStyle(
+                'PartiesTitleStyle',
                 parent=styles['Heading2'],
                 fontSize=14,
                 textColor=self.colors['primary'],
-                spaceAfter=8
+                spaceAfter=10
             )
             
-            # Student Info Table
-            student_data_table = [
-                ["Student Name:", student_data["full_name"]],
-                ["Student ID:", student_data["student_id"]],
-                ["Program:", student_data["program"]],
-                ["Semester:", student_data["academic_term"]],
-                ["Status:", "Full-Time Active"]
+            parties_title = Paragraph("PARTIES TO THIS AGREEMENT", parties_title_style)
+            elements.append(parties_title)
+            
+            # Parties Table
+            parties_data = [
+                ["EMPLOYER:", f"{school['name']}"],
+                ["ADDRESS:", f"{self.get_faker().street_address()}, {self.get_faker().city()}, {self.get_faker().postcode()}"],
+                ["EMPLOYEE:", employee_data["full_name"]],
+                ["EMPLOYEE ID:", employee_id],
+                ["POSITION:", employee_data["position"]],
+                ["DEPARTMENT:", employee_data["department"]]
             ]
             
-            student_table = Table(student_data_table, colWidths=[1.5*inch, 4.5*inch])
-            student_table.setStyle(TableStyle([
-                ('FONT', (0, 0), (-1, -1), 'Helvetica', 11),
+            parties_table = Table(parties_data, colWidths=[1.5*inch, 4.5*inch])
+            parties_table.setStyle(TableStyle([
+                ('FONT', (0, 0), (-1, -1), 'Helvetica', 10),
                 ('BACKGROUND', (0, 0), (0, -1), self.colors['row_odd']),
                 ('BACKGROUND', (1, 0), (1, -1), colors.white),
                 ('TEXTCOLOR', (0, 0), (-1, -1), self.colors['text_dark']),
@@ -977,75 +1024,77 @@ class ProfessionalReceiptGenerator:
                 ('PADDING', (0, 0), (-1, -1), 8),
             ]))
             
-            elements.append(student_table)
+            elements.append(parties_table)
             elements.append(Spacer(1, 15))
             
-            # Class Schedule
-            schedule_title = Paragraph("Class Schedule", student_info_style)
-            elements.append(schedule_title)
+            # Terms and Conditions
+            terms_title = Paragraph("TERMS AND CONDITIONS", parties_title_style)
+            elements.append(terms_title)
             
-            # Generate realistic courses
-            courses = self.generate_courses(student_data['program'])
+            # Terms content
+            terms_style = ParagraphStyle(
+                'TermsStyle',
+                parent=styles['Normal'],
+                fontSize=10,
+                textColor=self.colors['text_dark'],
+                alignment=4,  # Justify
+                spaceAfter=8,
+                leading=12
+            )
             
-            course_headers = ["Course Code", "Course Name", "Days", "Time", "Room", "Instructor"]
-            course_data = [course_headers]
+            annual_salary = self.format_currency(employee_data['salary_data']['annual_salary'], config)
+            hire_date = self.format_date(employee_data['hire_date'], config)
+            contract_end = self.format_date(employee_data['contract_end'], config) if employee_data['contract_end'] else "Ongoing"
             
-            for course in courses:
-                course_data.append([
-                    course["code"],
-                    course["name"],
-                    course["days"],
-                    course["time"],
-                    course["room"],
-                    course["instructor"]
-                ])
-            
-            course_table = Table(course_data, colWidths=[1*inch, 1.8*inch, 0.6*inch, 1.2*inch, 1*inch, 1.2*inch])
-            course_table.setStyle(TableStyle([
-                # Header
-                ('BACKGROUND', (0, 0), (-1, 0), self.colors['primary']),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 10),
-                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-                
-                # Data rows
-                ('FONT', (0, 1), (-1, -1), 'Helvetica', 9),
-                ('TEXTCOLOR', (0, 1), (-1, -1), self.colors['text_dark']),
-                ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
-                ('VALIGN', (0, 1), (-1, -1), 'MIDDLE'),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [self.colors['row_even'], self.colors['row_odd']]),
-                ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
-                ('PADDING', (0, 0), (-1, -1), 6),
-            ]))
-            
-            elements.append(course_table)
-            elements.append(Spacer(1, 15))
-            
-            # Semester Dates
-            dates_title = Paragraph("Important Dates", student_info_style)
-            elements.append(dates_title)
-            
-            dates_data = [
-                ["Semester Start:", self.format_date(student_data["first_day"], config)],
-                ["Semester End:", self.format_date(student_data["last_day"], config)],
-                ["Final Exams:", self.format_date(student_data["exam_week"], config)]
+            terms = [
+                f"<b>1. EMPLOYMENT TERM:</b> This contract begins on {hire_date} and continues {contract_end if employee_data['contract_end'] else 'until terminated by either party with appropriate notice'}.",
+                f"<b>2. POSITION AND DUTIES:</b> The Employee shall serve as {employee_data['position']} in the {employee_data['department']} Department.",
+                f"<b>3. COMPENSATION:</b> The Employee shall receive an annual salary of {annual_salary}, payable in accordance with the school's standard payroll schedule.",
+                f"<b>4. WORK SCHEDULE:</b> Standard working hours are 8:00 AM to 4:00 PM, Monday through Friday, with additional hours as needed for school activities.",
+                f"<b>5. BENEFITS:</b> The Employee is entitled to participate in the school's benefits program including health insurance, retirement plan, and paid leave.",
+                f"<b>6. PROFESSIONAL DEVELOPMENT:</b> The school will provide opportunities for professional growth and development relevant to the Employee's position.",
+                f"<b>7. CONFIDENTIALITY:</b> The Employee agrees to maintain confidentiality of all student records and school information.",
+                f"<b>8. TERMINATION:</b> Either party may terminate this agreement with 30 days written notice."
             ]
             
-            dates_table = Table(dates_data, colWidths=[1.5*inch, 4.5*inch])
-            dates_table.setStyle(TableStyle([
-                ('FONT', (0, 0), (-1, -1), 'Helvetica', 11),
-                ('BACKGROUND', (0, 0), (0, -1), self.colors['row_odd']),
-                ('BACKGROUND', (1, 0), (1, -1), colors.white),
+            for term in terms:
+                elements.append(Paragraph(term, terms_style))
+                elements.append(Spacer(1, 5))
+            
+            elements.append(Spacer(1, 15))
+            
+            # Signatures Section
+            signatures_title = Paragraph("SIGNATURES", parties_title_style)
+            elements.append(signatures_title)
+            
+            # Signatures table
+            signatures_data = [
+                ["FOR THE SCHOOL:", "", "EMPLOYEE:"],
+                ["", "", ""],
+                ["________________________", "", "________________________"],
+                ["Principal / Head of School", "", employee_data["full_name"]],
+                [f"{school['name']}", "", "Employee"],
+                [f"Date: {self.format_date(employee_data['current_date'], config)}", "", f"Date: {self.format_date(employee_data['current_date'], config)}"]
+            ]
+            
+            signatures_table = Table(signatures_data, colWidths=[2.5*inch, 1*inch, 2.5*inch])
+            signatures_table.setStyle(TableStyle([
+                ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 10),
+                ('FONT', (0, 2), (-1, 2), 'Helvetica', 10),
+                ('FONT', (0, 3), (-1, 4), 'Helvetica', 9),
+                ('FONT', (0, 5), (-1, 5), 'Helvetica', 9),
                 ('TEXTCOLOR', (0, 0), (-1, -1), self.colors['text_dark']),
                 ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-                ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-                ('BOX', (0, 0), (-1, -1), 1, self.colors['border']),
+                ('ALIGN', (2, 0), (2, -1), 'LEFT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LINEABOVE', (0, 2), (0, 2), 1, self.colors['text_dark']),
+                ('LINEABOVE', (2, 2), (2, 2), 1, self.colors['text_dark']),
                 ('PADDING', (0, 0), (-1, -1), 8),
             ]))
             
-            elements.append(dates_table)
+            elements.append(signatures_table)
             
-            # Verification Footer
+            # Footer
             footer_style = ParagraphStyle(
                 'FooterStyle',
                 parent=styles['Normal'],
@@ -1056,7 +1105,7 @@ class ProfessionalReceiptGenerator:
             )
             
             footer = Paragraph(
-                f"UNOFFICIAL STUDENT SCHEDULE • {college['name']} • Valid for verification purposes • Generated on: {self.format_date(student_data['date_issued'], config)}",
+                f"Official Employment Contract • {school['name']} • {contract_id} • For verification purposes only",
                 footer_style
             )
             elements.append(footer)
@@ -1064,52 +1113,265 @@ class ProfessionalReceiptGenerator:
             # Build PDF
             doc.build(elements)
             return filename
-
+            
         except Exception as e:
-            logger.error(f"Failed to create schedule PDF {filename}: {e}")
+            logger.error(f"Failed to create employment contract {filename}: {e}")
             return None
 
-    def generate_courses(self, program):
-        """Generate realistic courses based on program."""
-        base_courses = {
-            "Computer Science": [
-                {"code": "CS101", "name": "Introduction to Programming", "days": "MWF", "time": "09:00-09:50", "room": "CSB-201", "instructor": "Dr. Smith"},
-                {"code": "CS201", "name": "Data Structures", "days": "TTH", "time": "10:30-11:45", "room": "CSB-305", "instructor": "Prof. Johnson"},
-                {"code": "MATH151", "name": "Calculus I", "days": "MWF", "time": "11:00-11:50", "room": "MATH-102", "instructor": "Dr. Lee"},
-                {"code": "CS301", "name": "Algorithms", "days": "TTH", "time": "13:00-14:15", "room": "CSB-410", "instructor": "Prof. Garcia"},
-                {"code": "PHYS101", "name": "Physics I", "days": "MWF", "time": "14:00-14:50", "room": "SCI-205", "instructor": "Dr. Brown"}
-            ],
-            "Business Administration": [
-                {"code": "BUS101", "name": "Introduction to Business", "days": "MWF", "time": "09:00-09:50", "room": "BUS-101", "instructor": "Prof. Wilson"},
-                {"code": "ACC201", "name": "Financial Accounting", "days": "TTH", "time": "10:30-11:45", "room": "BUS-205", "instructor": "Dr. Martinez"},
-                {"code": "MKT301", "name": "Marketing Principles", "days": "MWF", "time": "11:00-11:50", "room": "BUS-310", "instructor": "Prof. Davis"},
-                {"code": "FIN401", "name": "Corporate Finance", "days": "TTH", "time": "13:00-14:15", "room": "BUS-415", "instructor": "Dr. Thompson"},
-                {"code": "MGT351", "name": "Organizational Behavior", "days": "MWF", "time": "14:00-14:50", "room": "BUS-320", "instructor": "Prof. Anderson"}
-            ],
-            "Engineering": [
-                {"code": "ENG101", "name": "Introduction to Engineering", "days": "MWF", "time": "09:00-09:50", "room": "ENG-101", "instructor": "Dr. Clark"},
-                {"code": "MATH251", "name": "Calculus II", "days": "TTH", "time": "10:30-11:45", "room": "MATH-105", "instructor": "Prof. White"},
-                {"code": "PHYS201", "name": "Physics II", "days": "MWF", "time": "11:00-11:50", "room": "SCI-210", "instructor": "Dr. Harris"},
-                {"code": "ENG301", "name": "Thermodynamics", "days": "TTH", "time": "13:00-14:15", "room": "ENG-305", "instructor": "Prof. Martin"},
-                {"code": "CSE211", "name": "Circuit Analysis", "days": "MWF", "time": "14:00-14:50", "room": "ENG-410", "instructor": "Dr. Young"}
-            ]
-        }
-        
-        return base_courses.get(program, base_courses["Computer Science"])
+    def create_employee_pay_stub(self, employee_data):
+        """Create a professional employee pay stub."""
+        school = employee_data['school']
+        employee_id = employee_data['employee_id']
+        school_id = school['id']
+        config = employee_data['country_config']
+        salary_data = employee_data['salary_data']
 
-    def format_date(self, date_obj, country_config):
-        """Format date according to country preferences."""
-        return date_obj.strftime(country_config['date_format'])
+        filename = f"PAYSTUB_{employee_id}_{school_id}.pdf"
+        filepath = os.path.join(self.documents_dir, filename)
 
-    def save_student(self, student_data):
-        """Save student data to file."""
         try:
-            with open(self.students_file, 'a', encoding='utf-8', buffering=32768) as f:
-                line = f"{student_data['full_name']}|{student_data['student_id']}|{student_data['college']['id']}|{student_data['college']['name']}|{self.selected_country}|{student_data['academic_term']}|{student_data['date_issued'].strftime('%Y-%m-%d')}|{student_data['first_day'].strftime('%Y-%m-%d')}|{student_data['last_day'].strftime('%Y-%m-%d')}\n"
+            # Create PDF document
+            doc = SimpleDocTemplate(
+                filepath,
+                pagesize=letter,
+                rightMargin=40,
+                leftMargin=40,
+                topMargin=40,
+                bottomMargin=20
+            )
+            
+            # Container for the 'Flowable' objects
+            elements = []
+            styles = getSampleStyleSheet()
+            
+            # Header
+            header_style = ParagraphStyle(
+                'HeaderStyle',
+                parent=styles['Heading1'],
+                fontSize=18,
+                textColor=self.colors['primary'],
+                alignment=1,
+                spaceAfter=10
+            )
+            
+            header = Paragraph("EMPLOYEE PAY STUB", header_style)
+            elements.append(header)
+            
+            # School Name
+            school_style = ParagraphStyle(
+                'SchoolStyle',
+                parent=styles['Heading2'],
+                fontSize=14,
+                textColor=self.colors['secondary'],
+                alignment=1,
+                spaceAfter=15
+            )
+            
+            school_name = Paragraph(school['name'], school_style)
+            elements.append(school_name)
+            
+            # Pay Period Information
+            period_style = ParagraphStyle(
+                'PeriodStyle',
+                parent=styles['Normal'],
+                fontSize=10,
+                textColor=self.colors['text_light'],
+                alignment=1,
+                spaceAfter=20
+            )
+            
+            pay_period = f"Pay Period: {self.format_date(salary_data['pay_period_start'], config)} - {self.format_date(salary_data['pay_period_end'], config)}"
+            pay_date = f"Pay Date: {self.format_date(salary_data['payment_date'], config)}"
+            period_info = Paragraph(f"{pay_period} | {pay_date}", period_style)
+            elements.append(period_info)
+            
+            # Employee Information Table
+            employee_info_title_style = ParagraphStyle(
+                'EmployeeInfoTitleStyle',
+                parent=styles['Heading2'],
+                fontSize=12,
+                textColor=self.colors['primary'],
+                spaceAfter=8
+            )
+            
+            employee_info_title = Paragraph("EMPLOYEE INFORMATION", employee_info_title_style)
+            elements.append(employee_info_title)
+            
+            employee_info_data = [
+                ["Employee Name:", employee_data["full_name"]],
+                ["Employee ID:", employee_id],
+                ["Position:", employee_data["position"]],
+                ["Department:", employee_data["department"]],
+                ["Contract Type:", employee_data["contract_type"]],
+                ["Pay Method:", salary_data["payment_method"]]
+            ]
+            
+            employee_info_table = Table(employee_info_data, colWidths=[1.5*inch, 4.5*inch])
+            employee_info_table.setStyle(TableStyle([
+                ('FONT', (0, 0), (-1, -1), 'Helvetica', 10),
+                ('BACKGROUND', (0, 0), (0, -1), self.colors['row_odd']),
+                ('BACKGROUND', (1, 0), (1, -1), colors.white),
+                ('TEXTCOLOR', (0, 0), (-1, -1), self.colors['text_dark']),
+                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('BOX', (0, 0), (-1, -1), 1, self.colors['border']),
+                ('PADDING', (0, 0), (-1, -1), 8),
+            ]))
+            
+            elements.append(employee_info_table)
+            elements.append(Spacer(1, 15))
+            
+            # Earnings Section
+            earnings_title = Paragraph("EARNINGS", employee_info_title_style)
+            elements.append(earnings_title)
+            
+            earnings_data = [
+                ["Description", "Rate", "Hours/Days", "Current", "YTD"],
+                ["Monthly Salary", f"{self.format_currency(salary_data['monthly_salary']/160, config)}/hr", "160.00", self.format_currency(salary_data['monthly_salary'], config), self.format_currency(salary_data['annual_salary'] * (employee_data['years_employed'] + 0.5), config)],
+                ["Bonus Payment", "", "", self.format_currency(salary_data['bonus_amount']/12, config), self.format_currency(salary_data['bonus_amount'], config)],
+                ["", "", "", "", ""],
+                ["TOTAL EARNINGS", "", "", self.format_currency(salary_data['monthly_salary'] + salary_data['bonus_amount']/12, config), self.format_currency((salary_data['annual_salary'] + salary_data['bonus_amount']) * (employee_data['years_employed'] + 0.5), config)]
+            ]
+            
+            earnings_table = Table(earnings_data, colWidths=[1.8*inch, 1*inch, 1*inch, 1.2*inch, 1.2*inch])
+            earnings_table.setStyle(TableStyle([
+                # Header
+                ('BACKGROUND', (0, 0), (-1, 0), self.colors['primary']),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 9),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                
+                # Data rows
+                ('FONT', (0, 1), (-1, -2), 'Helvetica', 9),
+                ('FONT', (0, -1), (-1, -1), 'Helvetica-Bold', 10),
+                ('TEXTCOLOR', (0, 1), (-1, -1), self.colors['text_dark']),
+                ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                
+                # Grid and styling
+                ('LINEABOVE', (0, -1), (-1, -1), 2, self.colors['paystub_green']),
+                ('BACKGROUND', (0, -1), (-1, -1), self.colors['paystub_light']),
+                ('TEXTCOLOR', (0, -1), (-1, -1), self.colors['paystub_green']),
+                ('LINEBELOW', (0, 0), (-1, -2), 0.5, self.colors['border']),
+                ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+                ('PADDING', (0, 0), (-1, -1), 6),
+            ]))
+            
+            elements.append(earnings_table)
+            elements.append(Spacer(1, 10))
+            
+            # Deductions Section
+            deductions_title = Paragraph("DEDUCTIONS", employee_info_title_style)
+            elements.append(deductions_title)
+            
+            deductions_data = [
+                ["Description", "Current", "YTD"],
+                ["Income Tax", self.format_currency(salary_data['tax_amount'], config), self.format_currency(salary_data['tax_amount'] * 12, config)],
+                ["Health Insurance", self.format_currency(salary_data['insurance'], config), self.format_currency(salary_data['insurance'] * 12, config)],
+                ["Retirement Plan", self.format_currency(salary_data['retirement'], config), self.format_currency(salary_data['retirement'] * 12, config)],
+                ["", "", ""],
+                ["TOTAL DEDUCTIONS", self.format_currency(salary_data['total_deductions'], config), self.format_currency(salary_data['total_deductions'] * 12, config)]
+            ]
+            
+            deductions_table = Table(deductions_data, colWidths=[3*inch, 1.5*inch, 1.5*inch])
+            deductions_table.setStyle(TableStyle([
+                # Header
+                ('BACKGROUND', (0, 0), (-1, 0), self.colors['primary']),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 9),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                
+                # Data rows
+                ('FONT', (0, 1), (-1, -2), 'Helvetica', 9),
+                ('FONT', (0, -1), (-1, -1), 'Helvetica-Bold', 10),
+                ('TEXTCOLOR', (0, 1), (-1, -1), self.colors['text_dark']),
+                ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                
+                # Grid and styling
+                ('LINEABOVE', (0, -1), (-1, -1), 2, colors.red),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor("#fee2e2")),
+                ('TEXTCOLOR', (0, -1), (-1, -1), colors.red),
+                ('LINEBELOW', (0, 0), (-1, -2), 0.5, self.colors['border']),
+                ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+                ('PADDING', (0, 0), (-1, -1), 6),
+            ]))
+            
+            elements.append(deductions_table)
+            elements.append(Spacer(1, 15))
+            
+            # Net Pay Section
+            net_pay_style = ParagraphStyle(
+                'NetPayStyle',
+                parent=styles['Heading2'],
+                fontSize=16,
+                textColor=self.colors['success'],
+                alignment=1,
+                spaceAfter=10
+            )
+            
+            net_pay_data = [
+                ["NET PAY", self.format_currency(salary_data['net_pay'], config)],
+                ["Payment Method", salary_data['payment_method']],
+                ["Transaction ID", salary_data['transaction_id']]
+            ]
+            
+            net_pay_table = Table(net_pay_data, colWidths=[3*inch, 3*inch])
+            net_pay_table.setStyle(TableStyle([
+                ('FONT', (0, 0), (0, 0), 'Helvetica-Bold', 14),
+                ('FONT', (0, 1), (-1, -1), 'Helvetica', 10),
+                ('TEXTCOLOR', (0, 0), (0, 0), self.colors['success']),
+                ('TEXTCOLOR', (1, 0), (1, 0), self.colors['success']),
+                ('TEXTCOLOR', (0, 1), (-1, -1), self.colors['text_dark']),
+                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LINEABOVE', (0, 0), (-1, 0), 3, self.colors['success']),
+                ('LINEBELOW', (0, 0), (-1, 0), 3, self.colors['success']),
+                ('BACKGROUND', (0, 0), (-1, 0), self.colors['paystub_light']),
+                ('BOX', (0, 0), (-1, -1), 1, self.colors['success']),
+                ('PADDING', (0, 0), (-1, -1), 12),
+            ]))
+            
+            elements.append(net_pay_table)
+            
+            # Footer
+            footer_style = ParagraphStyle(
+                'FooterStyle',
+                parent=styles['Normal'],
+                fontSize=8,
+                textColor=self.colors['text_light'],
+                alignment=1,
+                spaceBefore=20
+            )
+            
+            footer = Paragraph(
+                f"Official Pay Stub • {school['name']} • Transaction ID: {salary_data['transaction_id']} • For verification purposes only",
+                footer_style
+            )
+            elements.append(footer)
+            
+            # Build PDF
+            doc.build(elements)
+            return filename
+            
+        except Exception as e:
+            logger.error(f"Failed to create pay stub {filename}: {e}")
+            return None
+
+    def save_employee(self, employee_data):
+        """Save employee data to file."""
+        try:
+            with open(self.employees_file, 'a', encoding='utf-8', buffering=32768) as f:
+                contract_end = employee_data['contract_end'].strftime('%Y-%m-%d') if employee_data['contract_end'] else 'PERMANENT'
+                line = f"{employee_data['full_name']}|{employee_data['employee_id']}|{employee_data['school']['id']}|{employee_data['school']['name']}|{self.selected_country}|{employee_data['position']}|{employee_data['contract_type']}|{employee_data['hire_date'].strftime('%Y-%m-%d')}|{contract_end}|{employee_data['salary_data']['annual_salary']}|{employee_data['salary_data']['transaction_id']}\n"
                 f.write(line)
                 f.flush()
 
-            self.stats["students_saved"] += 1
+            self.stats["employees_saved"] += 1
             return True
         except Exception as e:
             logger.error(f"⚠️ Save error: {e}")
@@ -1117,35 +1379,37 @@ class ProfessionalReceiptGenerator:
 
     def process_one(self, num):
         try:
-            college = self.select_random_college()
-            if college is None:
+            school = self.select_random_school()
+            if school is None:
                 return False
             
-            student_data = self.generate_student_data(college)
+            employee_data = self.generate_employee_data(school)
                 
-            # Generate both tuition receipt and class schedule
-            receipt_filename, _ = self.create_tuition_receipt_pdf(student_data)
-            schedule_filename = self.create_class_schedule_pdf(student_data)
+            # Generate all three employment documents
+            verification_filename, _ = self.create_employment_verification_letter(employee_data)
+            contract_filename = self.create_employment_contract(employee_data)
+            paystub_filename = self.create_employee_pay_stub(employee_data)
             
-            if receipt_filename and schedule_filename:
-                self.save_student(student_data)
-                self.stats["receipts_generated"] += 1
+            if verification_filename and contract_filename and paystub_filename:
+                self.save_employee(employee_data)
+                self.stats["documents_generated"] += 1
                 return True
             return False
         except Exception as e:
-            logger.error(f"Error processing student {num}: {e}")
+            logger.error(f"Error processing employee {num}: {e}")
             return False
 
     def generate_bulk(self, quantity):
         config = COUNTRY_CONFIG[self.selected_country]
-        print(f"⚡ Generating {quantity} TUITION RECEIPTS + SCHEDULES for {config['flag']} {config['name']}")
-        print(f"✅ {len(self.all_colleges)} colleges loaded from JSON")
+        print(f"⚡ Generating {quantity} EMPLOYMENT DOCUMENTS for {config['flag']} {config['name']}")
+        print(f"✅ {len(self.all_schools)} schools loaded from JSON")
+        print("✅ EMPLOYMENT VERIFICATION: Professional verification letter")
+        print("✅ EMPLOYMENT CONTRACT: Official school employment contract")
+        print("✅ EMPLOYEE PAY STUB: Detailed salary payment stub")
         print("✅ INSTITUTION: Full school names from JSON only")
-        print("✅ STUDENT INFO: Name, ID, Program, Semester, Payment Proof")
-        print("✅ CURRENT DATES: Current/upcoming semester dates")
-        print("✅ TUITION RECEIPT: Professional receipt with payment details")
-        print("✅ CLASS SCHEDULE: Complete schedule with enrollment proof")
-        print("✅ SHEERID READY: Perfect for instant verification")
+        print("✅ EMPLOYEE INFO: Name, ID, Position, Department, Salary")
+        print("✅ CURRENT DATES: Valid employment dates")
+        print("✅ VERIFICATION READY: Perfect for employment verification")
         print("=" * 70)
 
         start = time.time()
@@ -1178,14 +1442,16 @@ class ProfessionalReceiptGenerator:
         print(f"✅ COMPLETE - {config['flag']} {config['name']}")
         print("="*70)
         print(f"⏱️  Time: {duration:.1f}s")
-        print(f"⚡ Speed: {rate_per_min:.0f} receipt+schedule sets/minute")
+        print(f"⚡ Speed: {rate_per_min:.0f} document sets/minute")
         print(f"✅ Success: {success}/{quantity}")
-        print(f"📁 Folder: {self.receipts_dir}/")
-        print(f"📄 Students: {self.students_file}")
-        print(f"✅ FORMAT: Professional PDF receipts + schedules")
+        print(f"📁 Folder: {self.documents_dir}/")
+        print(f"📄 Employees: {self.employees_file}")
+        print(f"✅ VERIFICATION LETTER: Professional employment verification")
+        print(f"✅ EMPLOYMENT CONTRACT: Official school contract")
+        print(f"✅ PAY STUB: Detailed salary payment information")
         print(f"✅ INSTITUTION: Names from JSON files only")
-        print(f"✅ DATES: Current/upcoming semester dates")
-        print(f"✅ SHEERID: Perfect for instant verification")
+        print(f"✅ DATES: Current employment dates")
+        print(f"✅ VERIFICATION: Perfect for employment verification")
         print("="*70)
 
     def interactive(self):
@@ -1196,11 +1462,11 @@ class ProfessionalReceiptGenerator:
             print(f"\n{'='*60}")
             print(f"Country: {config['flag']} {config['name']}")
             print(f"Total Generated: {total}")
-            print(f"Colleges from JSON: {len(self.all_colleges)}")
-            print(f"Mode: Professional receipts + schedules")
+            print(f"Schools from JSON: {len(self.all_schools)}")
+            print(f"Mode: Employment verification + contract + pay stub")
             print(f"Institution: JSON names only")
-            print(f"Dates: Current/upcoming semester")
-            print(f"Verification: SheerID ready")
+            print(f"Dates: Current employment dates")
+            print(f"Verification: Employment verification ready")
             print(f"{'='*60}")
             
             user_input = input(f"\nQuantity (0 to exit): ").strip()
@@ -1219,30 +1485,31 @@ class ProfessionalReceiptGenerator:
                 continue
             
             self.generate_bulk(quantity)
-            total = self.stats["receipts_generated"]
+            total = self.stats["documents_generated"]
 
 def main():
     print("\n" + "="*70)
-    print("PROFESSIONAL TUITION RECEIPT GENERATOR - SHEERID VERIFICATION READY")
+    print("PROFESSIONAL EMPLOYMENT DOCUMENT GENERATOR - VERIFICATION READY")
     print("="*70)
-    print("✅ TUITION RECEIPT: Professional receipt with payment proof")
-    print("✅ CLASS SCHEDULE: Complete schedule with enrollment proof") 
+    print("✅ EMPLOYMENT VERIFICATION: Professional verification letter")
+    print("✅ EMPLOYMENT CONTRACT: Official school employment contract")
+    print("✅ EMPLOYEE PAY STUB: Detailed salary payment stub")
     print("✅ INSTITUTION: Full school names from JSON only")
-    print("✅ STUDENT INFO: Name, ID, Program, Semester, Payment")
-    print("✅ CURRENT DATES: Current/upcoming semester dates")
-    print("✅ INSTANT APPROVAL: Super-fast verification system")
+    print("✅ EMPLOYEE INFO: Name, ID, Position, Department, Salary")
+    print("✅ CURRENT DATES: Valid employment dates")
+    print("✅ INSTANT VERIFICATION: Super-fast verification system")
     print("✅ PERFECT FORMAT: Professional PDF layout")
     print("✅ ALL 24 COUNTRIES: Complete global support")
     print("="*70)
     
-    gen = ProfessionalReceiptGenerator()
+    gen = ProfessionalEmploymentDocumentGenerator()
     
     if not gen.select_country_and_load():
         return
     
     gen.interactive()
     
-    print("\n✅ FINISHED! All documents are SheerID verification ready!")
+    print("\n✅ FINISHED! All documents are employment verification ready!")
 
 if __name__ == "__main__":
     try:
