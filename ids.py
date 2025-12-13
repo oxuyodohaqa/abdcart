@@ -1,15 +1,15 @@
 """
-SheerID Database Extractor - SCHOOLS & UNIVERSITIES ONLY
+SheerID Database Extractor - U.S. K-12 SCHOOLS ONLY
 Language: Python
 - Author: Adeebaabkhan
 - Date: 2025-11-25
-- Extracts ONLY schools and universities
-- English-only filtering 
+- Extracts ONLY K-12 schools in the United States
+- English-only filtering
 - NO duplicates - removes duplicate institutions
 - NO SSO testing - extracts everything instantly
 - High concurrency with 200 workers
-- Saves SCHOOLS & UNIVERSITIES to sheerid_[country].json
-- Schools and Universities ONLY - NO DUPLICATES
+- Saves K-12 schools to sheerid_[country].json
+- K-12 Schools ONLY - NO DUPLICATES
 """
 
 import requests
@@ -50,19 +50,18 @@ class FastSchoolsUniversitiesExtractor:
         # Output file
         self.output_filename = f"sheerid_{self.country.lower()}.json"
         
-        # ONLY ALLOW SCHOOLS AND UNIVERSITIES
+        # ONLY ALLOW K-12 SCHOOLS
         self.allowed_types = {
-            'UNIVERSITY', 'COLLEGE', 'SCHOOL',
-            'HIGHER_EDUCATION', 'COMMUNITY_COLLEGE', 'TECHNICAL_COLLEGE',
-            'VOCATIONAL_SCHOOL', 'GRADUATE_SCHOOL', 'MEDICAL_SCHOOL',
-            'LAW_SCHOOL', 'BUSINESS_SCHOOL'
+            'K12', 'PRIMARY', 'SECONDARY', 'MIDDLE_SCHOOL', 'HIGH_SCHOOL',
+            'ELEMENTARY', 'SCHOOL'
         }
-        
+
         self.excluded_types = {
-            'K12', 'PRIMARY', 'SECONDARY', 'MIDDLE_SCHOOL', 'POST_SECONDARY', 
-            'HIGH_SCHOOL', 'ELEMENTARY', 'GOVERNMENT', 'MILITARY',
-            'CORPORATION', 'NON_PROFIT', 'HEALTHCARE', 'LIBRARY',
-            'OTHER', 'UNKNOWN'
+            'UNIVERSITY', 'COLLEGE', 'HIGHER_EDUCATION', 'COMMUNITY_COLLEGE',
+            'TECHNICAL_COLLEGE', 'VOCATIONAL_SCHOOL', 'GRADUATE_SCHOOL',
+            'MEDICAL_SCHOOL', 'LAW_SCHOOL', 'BUSINESS_SCHOOL', 'POST_SECONDARY',
+            'GOVERNMENT', 'MILITARY', 'CORPORATION', 'NON_PROFIT', 'HEALTHCARE',
+            'LIBRARY', 'OTHER', 'UNKNOWN'
         }
         
         self._load_existing_data()
@@ -111,8 +110,8 @@ class FastSchoolsUniversitiesExtractor:
         
         return True
 
-    def is_school_or_university(self, institution: Dict) -> bool:
-        """STRICT validation - ONLY schools and universities"""
+    def is_k12_school(self, institution: Dict) -> bool:
+        """STRICT validation - ONLY K-12 schools"""
         name = institution.get('name', '').strip()
         
         if not name or len(name) < 2:
@@ -123,14 +122,14 @@ class FastSchoolsUniversitiesExtractor:
         
         if inst_type in self.allowed_types or org_type in self.allowed_types:
             return True
-        
+
         if inst_type in self.excluded_types or org_type in self.excluded_types:
             return False
         
         name_lower = name.lower()
         school_keywords = [
-            'university', 'college', 'institute', 'academy', 'school',
-            'polytechnic', 'institution', 'campus', 'faculty'
+            'high school', 'middle school', 'elementary', 'primary',
+            'secondary', 'k12', 'academy', 'school'
         ]
         
         for keyword in school_keywords:
@@ -239,7 +238,7 @@ class FastSchoolsUniversitiesExtractor:
             if not normalized['name']:
                 continue
             
-            if not self.is_school_or_university(normalized):
+            if not self.is_k12_school(normalized):
                 with self.lock:
                     self.stats.filtered_out += 1
                 continue
@@ -260,74 +259,28 @@ class FastSchoolsUniversitiesExtractor:
         
         # Single letters
         queries.extend(string.ascii_lowercase[:10])
-        
+
         # Double letters
         for letter1 in string.ascii_lowercase[:5]:
             for letter2 in string.ascii_lowercase[:3]:
                 queries.append(f"{letter1}{letter2}")
-        
-        # School keywords
+
+        # School keywords focused on K-12
         school_keywords = [
-            'uni', 'college', 'school', 'institute', 'academy'
+            'school', 'academy', 'high school', 'middle', 'elementary',
+            'secondary', 'primary', 'prep'
         ]
         queries.extend(school_keywords)
         
         # Empty query
         queries.append('')
         
-        # Country-specific terms
+        # Country-specific terms (focused on U.S. K-12 schools)
         country_schools = {
-            'US': ['harvard', 'stanford', 'mit', 'yale', 'ucla', 'berkeley'],
-            'CA': ['uoft', 'mcgill', 'ubc', 'waterloo'],
-            'GB': ['oxford', 'cambridge', 'ucl', 'imperial'],
-            'IN': ['iit', 'nit', 'bits', 'du'],
-            'ID': ['ui', 'itb', 'ugm', 'unair'],
-            'AU': ['unsw', 'usyd', 'monash', 'anu'],
-            'DE': ['tu', 'fu', 'hu', 'lmu'],
-            'FR': ['sorbonne', 'polytechnique', 'ens', 'paris'],
-            'ES': ['madrid', 'barcelona', 'valencia'],
-            'IT': ['rome', 'milan', 'bologna'],
-            'BR': ['usp', 'ufrj', 'unicamp'],
-            'MX': ['unam', 'tec', 'ipn'],
-            'NL': ['amsterdam', 'utrecht', 'leiden'],
-            'SE': ['stockholm', 'uppsala', 'lund'],
-            'NO': ['oslo', 'bergen', 'trondheim'],
-            'DK': ['copenhagen', 'aarhus', 'odense'],
-            'JP': ['tokyo', 'osaka', 'kyoto'],
-            'KR': ['snu', 'korea', 'yonsei'],
-            'SG': ['nus', 'ntu', 'smu'],
-            'NZ': ['auckland', 'otago', 'victoria'],
-            'ZA': ['wits', 'uct', 'stellenbosch'],
-            'CN': ['beijing', 'tsinghua', 'fudan'],
-            'AE': ['uae', 'dubai', 'abu dhabi'],
-            'PH': ['up', 'ateneo', 'dlsu'],
-            'MY': ['um', 'ukm', 'usm'],
-            'TH': ['bangkok', 'chulalongkorn'],
-            'VN': ['hanoi', 'ho chi minh'],
-            'TR': ['istanbul', 'ankara'],
-            'SA': ['riyadh', 'jeddah'],
-            'EG': ['cairo', 'alexandria'],
-            'NG': ['lagos', 'ibadan'],
-            'KE': ['nairobi', 'mombasa'],
-            'IL': ['hebrew', 'tel aviv'],
-            'RU': ['moscow', 'saint petersburg'],
-            'PL': ['warsaw', 'krakow'],
-            'CZ': ['prague', 'brno'],
-            'HU': ['budapest', 'debrecen'],
-            'AT': ['vienna', 'graz'],
-            'CH': ['zurich', 'geneva'],
-            'BE': ['brussels', 'leuven'],
-            'PT': ['lisbon', 'porto'],
-            'IE': ['dublin', 'cork'],
-            'FI': ['helsinki', 'tampere'],
-            'CL': ['santiago', 'valparaiso'],
-            'AR': ['buenos aires', 'cordoba'],
-            'CO': ['bogota', 'medellin'],
-            'PE': ['lima', 'cusco'],
-            'EC': ['quito', 'guayaquil'],
-            'VE': ['caracas', 'maracaibo']
+            'US': ['high school', 'elementary school', 'middle school',
+                   'public school', 'charter school', 'prep school']
         }
-        
+
         if self.country in country_schools:
             queries.extend(country_schools[self.country])
         
@@ -398,14 +351,14 @@ class FastSchoolsUniversitiesExtractor:
         print(f"📞 Total API Requests: {self.stats.total_requests:,}")
         print(f"✅ Successful Requests: {self.stats.successful_requests:,}")
         print(f"🔍 Total Found: {self.stats.total_found:,}")
-        print(f"🏫 Unique Schools & Universities: {self.stats.institutions_saved:,}")
+        print(f"🏫 Unique K-12 Schools: {self.stats.institutions_saved:,}")
         print(f"🚫 Filtered Out: {self.stats.filtered_out:,}")
         print(f"🔄 Duplicates Removed: {self.stats.duplicates_removed:,}")
         print(f"⚠️ Rate Limited: {self.stats.rate_limited:,}")
         print(f"❌ Errors: {self.stats.errors:,}")
         
         if self.institutions:
-            print(f"\n🎯 SAMPLE UNIQUE INSTITUTIONS:")
+            print(f"\n🎯 SAMPLE UNIQUE K-12 INSTITUTIONS:")
             sample = list(self.institutions.values())[:10]
             for i, inst in enumerate(sample, 1):
                 inst_type = inst.get('type', 'N/A')
@@ -413,10 +366,10 @@ class FastSchoolsUniversitiesExtractor:
 
     def run_extraction(self, max_workers: int = 50):
         """MAIN EXTRACTION - NO DUPLICATES"""
-        print(f"\n🚀 STARTING {self.country} SCHOOL & UNIVERSITY EXTRACTION")
+        print(f"\n🚀 STARTING {self.country} K-12 SCHOOL EXTRACTION")
         print(f"👤 Author: Adeebaabkhan")
         print(f"📅 Date: {datetime.now().strftime('%Y-%m-%d')}")
-        print(f"🎯 Focus: SCHOOLS & UNIVERSITIES ONLY")
+        print(f"🎯 Focus: K-12 SCHOOLS ONLY")
         print(f"🔄 Workers: {max_workers}")
         print(f"🚫 DUPLICATES: REMOVED")
         print(f"💾 Output: {self.output_filename}")
@@ -426,7 +379,7 @@ class FastSchoolsUniversitiesExtractor:
         start_time = time.time()
         last_save = start_time
         
-        print(f"\n⏱️ STARTING EXTRACTION...")
+        print(f"\n⏱️ STARTING K-12 EXTRACTION...")
         print(f"🔤 Processing {len(queries)} queries with {max_workers} workers")
         
         completed_tasks = 0
@@ -466,68 +419,20 @@ class FastSchoolsUniversitiesExtractor:
         elapsed = time.time() - start_time
         total_institutions = self.stats.institutions_saved
         print(f"\n🎉 EXTRACTION COMPLETED in {elapsed:.1f} seconds!")
-        print(f"📊 Total UNIQUE SCHOOLS & UNIVERSITIES: {total_institutions:,}")
+        print(f"📊 Total UNIQUE K-12 SCHOOLS: {total_institutions:,}")
         if elapsed > 0:
             print(f"🚀 Speed: {(total_institutions / elapsed * 60):.0f}/minute")
         print(f"💾 Saved to: {self.output_filename}")
 
 def get_country_selection():
-    """Interactive country selection - ALL COUNTRIES"""
+    """Interactive country selection - U.S. only for K-12 extraction"""
     countries = {
-        '1': ('US', 'United States'),
-        '2': ('CA', 'Canada'),
-        '3': ('GB', 'United Kingdom'),
-        '4': ('IN', 'India'),
-        '5': ('ID', 'Indonesia'),
-        '6': ('AU', 'Australia'),
-        '7': ('DE', 'Germany'),
-        '8': ('FR', 'France'),
-        '9': ('ES', 'Spain'),
-        '10': ('IT', 'Italy'),
-        '11': ('BR', 'Brazil'),
-        '12': ('MX', 'Mexico'),
-        '13': ('NL', 'Netherlands'),
-        '14': ('SE', 'Sweden'),
-        '15': ('NO', 'Norway'),
-        '16': ('DK', 'Denmark'),
-        '17': ('JP', 'Japan'),
-        '18': ('KR', 'South Korea'),
-        '19': ('SG', 'Singapore'),
-        '20': ('NZ', 'New Zealand'),
-        '21': ('ZA', 'South Africa'),
-        '22': ('CN', 'China'),
-        '23': ('AE', 'UAE'),
-        '24': ('PH', 'Philippines'),
-        '25': ('MY', 'Malaysia'),
-        '26': ('TH', 'Thailand'),
-        '27': ('VN', 'Vietnam'),
-        '28': ('TR', 'Turkey'),
-        '29': ('SA', 'Saudi Arabia'),
-        '30': ('EG', 'Egypt'),
-        '31': ('NG', 'Nigeria'),
-        '32': ('KE', 'Kenya'),
-        '33': ('IL', 'Israel'),
-        '34': ('RU', 'Russia'),
-        '35': ('PL', 'Poland'),
-        '36': ('CZ', 'Czech Republic'),
-        '37': ('HU', 'Hungary'),
-        '38': ('AT', 'Austria'),
-        '39': ('CH', 'Switzerland'),
-        '40': ('BE', 'Belgium'),
-        '41': ('PT', 'Portugal'),
-        '42': ('IE', 'Ireland'),
-        '43': ('FI', 'Finland'),
-        '44': ('CL', 'Chile'),
-        '45': ('AR', 'Argentina'),
-        '46': ('CO', 'Colombia'),
-        '47': ('PE', 'Peru'),
-        '48': ('EC', 'Ecuador'),
-        '49': ('VE', 'Venezuela')
+        '1': ('US', 'United States')
     }
-    
-    print("\n🌍 SELECT COUNTRY FOR SCHOOL & UNIVERSITY EXTRACTION")
-    print("🏫 Extracts ONLY schools and universities")
-    print("🎓 Includes: Universities, Colleges, Institutes")
+
+    print("\n🌍 SELECT COUNTRY FOR K-12 SCHOOL EXTRACTION")
+    print("🏫 Extracts ONLY K-12 schools")
+    print("🎓 Includes: Elementary, Middle, and High Schools")
     print("🚫 DUPLICATES: REMOVED")
     print("=" * 50)
     
@@ -551,7 +456,7 @@ def get_country_selection():
             if choice in countries:
                 country_code, country_name = countries[choice]
                 print(f"\n✅ Selected: {country_name} ({country_code})")
-                print(f"🏫 Will extract ONLY schools and universities")
+                print(f"🏫 Will extract ONLY K-12 schools")
                 print(f"🚫 DUPLICATES will be REMOVED")
                 
                 confirm = input(f"Start extraction? (y/n): ").strip().lower()
@@ -568,12 +473,12 @@ def get_country_selection():
             exit(0)
 
 def main():
-    print(f"🚀 SheerID School & University Extractor")
+    print(f"🚀 SheerID K-12 School Extractor")
     print(f"👤 Author: Adeebaabkhan")
     print(f"📅 Date: {datetime.now().strftime('%Y-%m-%d')}")
-    print(f"🏫 Extracts ONLY schools and universities")
+    print(f"🏫 Extracts ONLY K-12 schools")
     print(f"🚫 DUPLICATES: REMOVED")
-    
+
     country = get_country_selection()
     
     print(f"\n⚙️ EXTRACTION SETUP")
@@ -584,7 +489,7 @@ def main():
     
     print(f"\n🚀 STARTING EXTRACTION...")
     print(f"🌍 Country: {country}")
-    print(f"🏫 Target: SCHOOLS & UNIVERSITIES ONLY")
+    print(f"🏫 Target: K-12 SCHOOLS ONLY")
     print(f"🚫 DUPLICATES: REMOVED")
     print(f"💾 Output: sheerid_{country.lower()}.json")
     
