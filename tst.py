@@ -640,8 +640,8 @@ class ProfessionalEmploymentDocumentGenerator:
         full_name = clean_name(f"{first_name} {last_name}")
         employee_id = f"EMP{fake.random_number(digits=6, fix_len=True)}"
         
-        # CURRENT EMPLOYMENT DATES for verification
-        current_date = datetime.now()
+        # CURRENT EMPLOYMENT DATES for verification (backdated 10-15 days)
+        current_date = datetime.now() - timedelta(days=random.choice([10, 15]))
         
         # Generate employment dates (hired 1-5 years ago)
         years_employed = random.randint(1, 5)
