@@ -640,8 +640,8 @@ class ProfessionalEmploymentDocumentGenerator:
         full_name = clean_name(f"{first_name} {last_name}")
         employee_id = f"EMP{fake.random_number(digits=6, fix_len=True)}"
         
-        # CURRENT EMPLOYMENT DATES for verification
-        current_date = datetime.now()
+        # CURRENT EMPLOYMENT DATES for verification (backdated 10-15 days)
+        current_date = datetime.now() - timedelta(days=random.choice([10, 15]))
         
         # Generate employment dates (hired 1-5 years ago)
         years_employed = random.randint(1, 5)
@@ -654,21 +654,42 @@ class ProfessionalEmploymentDocumentGenerator:
         else:
             contract_end = None  # Permanent position
         
-        # Country-specific positions
+        # Country-specific positions (K-12 teachers only)
         positions_by_country = {
-            'US': ["Teacher", "Senior Teacher", "Department Head", "Vice Principal", "Principal"],
-            'GB': ["Teacher", "Senior Teacher", "Head of Department", "Deputy Head", "Head Teacher"],
-            'IN': ["Teacher", "Senior Teacher", "Head of Department", "Vice Principal", "Principal"],
-            'ID': ["Guru", "Guru Senior", "Kepala Jurusan", "Wakil Kepala Sekolah", "Kepala Sekolah"],
-            'DE': ["Lehrer", "Oberlehrer", "Fachbereichsleiter", "Konrektor", "Rektor"],
-            'FR': ["Professeur", "Professeur Principal", "Chef de Département", "Principal Adjoint", "Principal"],
-            'ES': ["Profesor", "Profesor Titular", "Jefe de Departamento", "Subdirector", "Director"],
-            'IT': ["Insegnante", "Insegnante Esperto", "Capo Dipartimento", "Vice Preside", "Preside"],
-            'JP': ["教師", "主任教師", "学科主任", "教頭", "校長"],
-            'KR': ["교사", "주임교사", "학과장", "교감", "교장"]
+            'US': [
+                "Teacher", "Elementary School Teacher", "High School Teacher",
+                "Special Education Teacher", "Substitute Teacher"
+            ],
+            'GB': [
+                "Classroom Teacher", "Primary School Teacher", "Secondary School Teacher",
+                "Specialist Teacher", "Cover Teacher"
+            ],
+            'IN': [
+                "Teacher", "Primary Teacher", "Secondary Teacher",
+                "Subject Teacher", "Assistant Teacher"
+            ],
+            'ID': ["Guru", "Guru Kelas", "Guru Mata Pelajaran", "Guru Pengganti"],
+            'DE': ["Lehrer", "Klassenlehrer", "Fachlehrer", "Vertretungslehrer"],
+            'FR': [
+                "Professeur", "Enseignant", "Professeur des écoles",
+                "Professeur de lycée", "Professeur remplaçant"
+            ],
+            'ES': [
+                "Profesor", "Maestro", "Profesor de Secundaria",
+                "Profesor de Primaria", "Profesor Sustituto"
+            ],
+            'IT': [
+                "Insegnante", "Docente di Scuola Primaria", "Docente di Scuola Superiore",
+                "Docente di Sostegno", "Supplente"
+            ],
+            'JP': ["教師", "小学校教師", "中学校教師", "高校教師", "代用教員"],
+            'KR': ["교사", "초등학교 교사", "중학교 교사", "고등학교 교사", "대체 교사"]
         }
-        
-        positions = positions_by_country.get(self.selected_country, ["Teacher", "Senior Teacher", "Department Head"])
+
+        positions = positions_by_country.get(
+            self.selected_country,
+            ["Teacher", "Classroom Teacher", "Subject Teacher"]
+        )
         departments = config.get('departments', ["Mathematics", "Science", "English"])
         
         # Generate salary data
@@ -868,9 +889,11 @@ class ProfessionalEmploymentDocumentGenerator:
                 spaceAfter=5
             )
             
-            principal_names = ["Dr. Robert Johnson", "Ms. Sarah Williams", "Mr. Michael Brown", 
-                             "Dr. Jennifer Davis", "Mr. James Wilson", "Ms. Patricia Miller"]
-            signature = Paragraph(random.choice(principal_names), signature_style)
+            teacher_signatories = [
+                "Ms. Emily Parker", "Mr. Daniel Thompson", "Ms. Olivia Harris",
+                "Mr. Andrew Lewis", "Ms. Sophia Martinez", "Mr. Benjamin Clark"
+            ]
+            signature = Paragraph(random.choice(teacher_signatories), signature_style)
             elements.append(signature)
             
             position_style = ParagraphStyle(
@@ -881,7 +904,7 @@ class ProfessionalEmploymentDocumentGenerator:
                 alignment=0
             )
             
-            position = Paragraph("Principal / Head of School", position_style)
+            position = Paragraph("Lead Teacher / Classroom Teacher", position_style)
             elements.append(position)
             
             elements.append(Spacer(1, 10))
@@ -1072,7 +1095,7 @@ class ProfessionalEmploymentDocumentGenerator:
                 ["FOR THE SCHOOL:", "", "EMPLOYEE:"],
                 ["", "", ""],
                 ["________________________", "", "________________________"],
-                ["Principal / Head of School", "", employee_data["full_name"]],
+                ["Lead Teacher / Classroom Teacher", "", employee_data["full_name"]],
                 [f"{school['name']}", "", "Employee"],
                 [f"Date: {self.format_date(employee_data['current_date'], config)}", "", f"Date: {self.format_date(employee_data['current_date'], config)}"]
             ]
