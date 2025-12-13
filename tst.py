@@ -123,10 +123,10 @@ class EducatorDocumentGenerator:
             
             if os.path.exists(self.employees_file):
                 os.remove(self.employees_file)
-            
+
             print("🗑️  All previous data cleared!")
             print("✅ EMPLOYMENT LETTER: Official school verification")
-            print("✅ ID BADGE: Professional staff identification")
+            print("✅ EMPLOYMENT CONTRACT: Detailed school agreement")
             print("✅ PAY STUB: Recent salary documentation")
             print("✅ LETTERHEAD: Official school branding")
             print("✅ REQUIRED DETAILS: Name, Title, School, Dates")
@@ -487,6 +487,48 @@ class EducatorDocumentGenerator:
                 spaceAfter=10
             )
 
+            letterhead_left = Paragraph(
+                f"<b>{school['name']}</b><br/>{school['district']}<br/>{school['address']}<br/>"
+                f"Phone: {school['phone']}<br/>Email: {school['email']}",
+                ParagraphStyle(
+                    'LetterheadLeft',
+                    parent=styles['Normal'],
+                    fontSize=9,
+                    leading=12,
+                    textColor=self.colors['text_dark'],
+                )
+            )
+
+            letterhead_right = Paragraph(
+                f"<b>OFFICIAL CONTRACT</b><br/>School Year {USA_CONFIG['school_year']}<br/>"
+                f"Issued: {datetime.now().strftime('%B %d, %Y')}<br/>{USA_CONFIG['flag']} United States",
+                ParagraphStyle(
+                    'LetterheadRight',
+                    parent=styles['Normal'],
+                    fontSize=9,
+                    leading=12,
+                    alignment=2,
+                    textColor=self.colors['text_dark'],
+                )
+            )
+
+            letterhead_table = Table(
+                [[letterhead_left, letterhead_right]],
+                colWidths=[3.5 * inch, 2.5 * inch]
+            )
+            letterhead_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), self.colors['row_odd']),
+                ('BOX', (0, 0), (-1, -1), 0.75, self.colors['border']),
+                ('INNERGRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ]))
+
+            elements.append(letterhead_table)
+            elements.append(Spacer(1, 14))
+
             elements.append(Paragraph(school['name'], title_style))
             elements.append(Paragraph(f"{school['district']} • {school['address']} • {school['phone']}", subtitle_style))
 
@@ -623,7 +665,48 @@ class EducatorDocumentGenerator:
             
             elements = []
             styles = getSampleStyleSheet()
-            
+
+            letterhead_left = Paragraph(
+                f"<b>{educator_data['school']['name']}</b><br/>{educator_data['school']['district']}<br/>"
+                f"Payroll Department • {educator_data['school']['address']}",
+                ParagraphStyle(
+                    'PayStubLeft',
+                    parent=styles['Normal'],
+                    fontSize=9,
+                    leading=12,
+                    textColor=self.colors['text_dark'],
+                )
+            )
+
+            letterhead_right = Paragraph(
+                f"<b>PAY STUB</b><br/>Issued: {datetime.now().strftime('%B %d, %Y')}<br/>{USA_CONFIG['flag']} Official",
+                ParagraphStyle(
+                    'PayStubRight',
+                    parent=styles['Normal'],
+                    fontSize=9,
+                    leading=12,
+                    alignment=2,
+                    textColor=self.colors['text_dark'],
+                )
+            )
+
+            letterhead_table = Table(
+                [[letterhead_left, letterhead_right]],
+                colWidths=[3.5 * inch, 2.5 * inch]
+            )
+            letterhead_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), self.colors['row_odd']),
+                ('BOX', (0, 0), (-1, -1), 0.75, self.colors['border']),
+                ('INNERGRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ]))
+
+            elements.append(letterhead_table)
+            elements.append(Spacer(1, 12))
+
             # Header
             header_style = ParagraphStyle(
                 'HeaderStyle',
@@ -633,10 +716,10 @@ class EducatorDocumentGenerator:
                 alignment=1,
                 spaceAfter=10
             )
-            
+
             header = Paragraph("EMPLOYEE PAY STUB", header_style)
             elements.append(header)
-            
+
             # School Info
             school_style = ParagraphStyle(
                 'SchoolStyle',
@@ -646,10 +729,10 @@ class EducatorDocumentGenerator:
                 alignment=1,
                 spaceAfter=15
             )
-            
+
             school_info = Paragraph(f"{educator_data['school']['name']} • {educator_data['school']['district']}", school_style)
             elements.append(school_info)
-            
+
             elements.append(Spacer(1, 15))
             
             # Pay Period Info
