@@ -85,11 +85,38 @@ USA_CONFIG = {
     ]
 }
 
+def normalize_school_type(value: str):
+    if not value:
+        return None
+
+    value = value.strip().lower()
+    mapping = {
+        "1": "ELEMENTARY",
+        "elementary": "ELEMENTARY",
+        "k-5": "ELEMENTARY",
+        "k5": "ELEMENTARY",
+        "primary": "ELEMENTARY",
+        "2": "MIDDLE",
+        "middle": "MIDDLE",
+        "6-8": "MIDDLE",
+        "6_8": "MIDDLE",
+        "junior": "MIDDLE",
+        "junior-high": "MIDDLE",
+        "3": "HIGH",
+        "high": "HIGH",
+        "9-12": "HIGH",
+        "912": "HIGH",
+        "senior": "HIGH"
+    }
+
+    return mapping.get(value)
+
+
 class EducatorDocumentGenerator:
-    def __init__(self, custom_teacher_name=None, custom_school_name=None):
+    def __init__(self, custom_teacher_name=None, custom_school_name=None, preselected_school_type=None):
         self.documents_dir = "educator_documents"
         self.employees_file = "educators.txt"
-        self.selected_school_type = None
+        self.selected_school_type = preselected_school_type if preselected_school_type in K12_SCHOOL_TYPES else None
         self.schools = []
 
         self.custom_teacher_name = clean_name(custom_teacher_name) if custom_teacher_name else None
@@ -204,25 +231,23 @@ class EducatorDocumentGenerator:
         print("2. Middle School (6-8)")
         print("3. High School (9-12)")
         print("=" * 70)
-        
-        while True:
-            choice = input("\nSelect school type (1-3): ").strip()
-            if choice == '1':
-                self.selected_school_type = 'ELEMENTARY'
-                break
-            elif choice == '2':
-                self.selected_school_type = 'MIDDLE'
-                break
-            elif choice == '3':
-                self.selected_school_type = 'HIGH'
-                break
-            else:
-                print("❌ Please enter 1, 2, or 3")
-        
+
+        if self.selected_school_type:
+            print(f"✅ Using preselected option: {self.selected_school_type} School")
+        else:
+            while True:
+                choice = input("\nSelect school type (1-3): ").strip()
+                normalized = normalize_school_type(choice)
+                if normalized:
+                    self.selected_school_type = normalized
+                    break
+                else:
+                    print("❌ Please enter 1, 2, or 3")
+
         self.schools = self.load_schools()
         print(f"✅ Selected: {self.selected_school_type} School")
         print(f"📚 Schools available: {len(self.schools)}")
-        
+
         return True
     
     def generate_educator_data(self):
@@ -979,6 +1004,11 @@ def main():
     parser = argparse.ArgumentParser(description="Generate educator verification documents.")
     parser.add_argument("--teacher-name", help="Teacher name to use in generated documents", default=None)
     parser.add_argument("--school-name", help="School name to use in generated documents", default=None)
+    parser.add_argument(
+        "--school-type",
+        help="Preselect school type: 1/elementary, 2/middle, or 3/high",
+        default=None
+    )
     args = parser.parse_args()
 
     print("\n" + "="*70)
@@ -995,15 +1025,38 @@ def main():
     print("   3. Recent Pay Stub")
     print("="*70)
 
+    teacher_name = clean_name(args.teacher_name) if args.teacher_name else None
+    school_name = clean_name(args.school_name) if args.school_name else None
+
+    if not teacher_name:
+        provided = input("What is the teacher's full name? (press Enter to generate one automatically): ").strip()
+        teacher_name = clean_name(provided) if provided else None
+
+    if not school_name:
+        provided = input("What is the official school name? (press Enter to generate one automatically): ").strip()
+        school_name = clean_name(provided) if provided else None
+
     generator = EducatorDocumentGenerator(
-        custom_teacher_name=args.teacher_name,
-        custom_school_name=args.school_name
+        custom_teacher_name=teacher_name,
+        custom_school_name=school_name,
+        preselected_school_type=normalize_school_type(args.school_type)
     )
 
-    if args.teacher_name:
-        print(f"🧑‍🏫 Using provided teacher name: {generator.custom_teacher_name}")
-    if args.school_name:
-        print(f"🏫 Using provided school name: {generator.custom_school_name}")
+    if generator.custom_teacher_name:
+        print(f"🧑‍🏫 Using teacher name: {generator.custom_teacher_name}")
+    else:
+        print("🧑‍🏫 No teacher name provided. A realistic name will be generated.")
+
+    if generator.custom_school_name:
+        print(f"🏫 Using school name: {generator.custom_school_name}")
+    else:
+        print("🏫 No school name provided. A school will be generated for you.")
+    if args.school_type:
+        provided_type = normalize_school_type(args.school_type)
+        if provided_type:
+            print(f"🏫 Using provided school type: {provided_type.title()} School")
+        else:
+            print("❌ Invalid school type provided. Please use 1, 2, 3 or elementary/middle/high.")
 
     if not generator.select_school_type():
         return
