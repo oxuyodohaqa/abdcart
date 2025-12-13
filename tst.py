@@ -2,7 +2,7 @@
 """
 PROFESSIONAL EDUCATOR VERIFICATION DOCUMENT GENERATOR - USA K-12 SCHOOLS
 ✅ EMPLOYMENT LETTER: Official school-issued employment verification
-✅ ID BADGE: Professional school staff identification
+✅ EMPLOYMENT CONTRACT: School employment agreement with key terms
 ✅ PAY STUB: Recent salary payment documentation
 ✅ ALL REQUIRED DETAILS: Full name, job title, school name, dates
 ✅ K-12 SPECIFIC: Elementary, Middle, and High Schools
@@ -23,7 +23,6 @@ import json
 from datetime import datetime, timedelta
 from io import BytesIO
 import time
-from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -47,25 +46,22 @@ K12_SCHOOL_TYPES = {
     'ELEMENTARY': {
         'grades': ['K', '1st', '2nd', '3rd', '4th', '5th'],
         'subjects': ['Reading', 'Mathematics', 'Science', 'Social Studies', 'Art', 'Music', 'Physical Education'],
-        'job_titles': ['Elementary Teacher', 'Grade Level Teacher', 'Special Education Teacher', 
-                      'Reading Specialist', 'Math Specialist', 'Elementary School Principal',
-                      'Assistant Principal', 'School Counselor', 'Librarian']
+        'job_titles': ['Elementary Teacher', 'Grade Level Teacher', 'Special Education Teacher',
+                      'Reading Specialist', 'Math Specialist', 'School Counselor', 'Librarian']
     },
     'MIDDLE': {
         'grades': ['6th', '7th', '8th'],
-        'subjects': ['English Language Arts', 'Mathematics', 'Science', 'Social Studies', 
+        'subjects': ['English Language Arts', 'Mathematics', 'Science', 'Social Studies',
                     'Foreign Language', 'Art', 'Music', 'Physical Education', 'Technology'],
         'job_titles': ['Middle School Teacher', 'Subject Teacher', 'Special Education Teacher',
-                      'Department Chair', 'Middle School Principal', 'Assistant Principal',
-                      'School Counselor', 'Athletic Director']
+                      'Department Chair', 'School Counselor', 'Athletic Director']
     },
     'HIGH': {
         'grades': ['9th', '10th', '11th', '12th'],
         'subjects': ['English', 'Mathematics', 'Science', 'Social Studies', 'Foreign Language',
                     'Art', 'Music', 'Physical Education', 'Technology', 'Career Education'],
-        'job_titles': ['High School Teacher', 'Subject Teacher', 'Department Chair', 
-                      'Special Education Teacher', 'High School Principal', 'Assistant Principal',
-                      'School Counselor', 'Athletic Director', 'Dean of Students']
+        'job_titles': ['High School Teacher', 'Subject Teacher', 'Department Chair',
+                      'Special Education Teacher', 'School Counselor', 'Athletic Director', 'Dean of Students']
     }
 }
 
@@ -433,62 +429,179 @@ class EducatorDocumentGenerator:
             logger.error(f"Failed to create employment letter: {e}")
             return None
     
-    def create_id_badge(self, educator_data):
-        """Create professional school ID badge."""
+    def create_employment_contract(self, educator_data):
+        """Create formal school employment contract with key terms."""
         school = educator_data['school']
         employee_id = educator_data['employee_id']
-        
-        filename = f"ID_BADGE_{employee_id}.pdf"
+
+        filename = f"EMPLOYMENT_CONTRACT_{employee_id}.pdf"
         filepath = os.path.join(self.documents_dir, filename)
-        
+
         try:
-            c = canvas.Canvas(filepath, pagesize=(3.375*inch, 2.125*inch))  # Standard ID card size
-            
-            # Background
-            c.setFillColor(self.colors['primary'])
-            c.rect(0, 0, 3.375*inch, 0.5*inch, fill=1, stroke=0)
-            
-            # School Name
-            c.setFillColor(self.colors['white'])
-            c.setFont("Helvetica-Bold", 10)
-            c.drawString(0.2*inch, 2.0*inch, school['name'][:30])
-            
-            # Employee Photo Area
-            c.setFillColor(self.colors['border'])
-            c.rect(0.2*inch, 0.7*inch, 1*inch, 1.2*inch, fill=1, stroke=1)
-            c.setFillColor(self.colors['text_light'])
-            c.setFont("Helvetica", 8)
-            c.drawString(0.3*inch, 1.3*inch, "PHOTO")
-            
-            # Employee Info
-            c.setFillColor(self.colors['text_dark'])
-            c.setFont("Helvetica-Bold", 12)
-            c.drawString(1.3*inch, 1.7*inch, educator_data['full_name'])
-            
-            c.setFont("Helvetica", 9)
-            c.drawString(1.3*inch, 1.5*inch, f"Title: {educator_data['job_title']}")
-            c.drawString(1.3*inch, 1.3*inch, f"ID: {educator_data['employee_id']}")
-            c.drawString(1.3*inch, 1.1*inch, f"Dept: Education")
-            
-            # Issue Date
-            c.setFont("Helvetica", 7)
-            c.drawString(1.3*inch, 0.9*inch, f"Issued: {datetime.now().strftime('%m/%d/%Y')}")
-            
-            # Footer
-            c.setFillColor(self.colors['text_light'])
-            c.setFont("Helvetica-Oblique", 6)
-            c.drawString(0.2*inch, 0.2*inch, "OFFICIAL SCHOOL STAFF IDENTIFICATION")
-            
-            # Border
-            c.setStrokeColor(self.colors['border'])
-            c.setLineWidth(1)
-            c.rect(0.1*inch, 0.1*inch, 3.175*inch, 1.925*inch, fill=0, stroke=1)
-            
-            c.save()
+            doc = SimpleDocTemplate(
+                filepath,
+                pagesize=letter,
+                rightMargin=40,
+                leftMargin=40,
+                topMargin=40,
+                bottomMargin=20
+            )
+
+            elements = []
+            styles = getSampleStyleSheet()
+
+            title_style = ParagraphStyle(
+                'ContractTitle',
+                parent=styles['Heading1'],
+                fontSize=18,
+                textColor=self.colors['primary'],
+                alignment=1,
+                spaceAfter=12
+            )
+
+            subtitle_style = ParagraphStyle(
+                'Subtitle',
+                parent=styles['Normal'],
+                fontSize=10,
+                textColor=self.colors['text_light'],
+                alignment=1,
+                spaceAfter=20
+            )
+
+            section_header = ParagraphStyle(
+                'SectionHeader',
+                parent=styles['Heading2'],
+                fontSize=13,
+                textColor=self.colors['primary'],
+                alignment=0,
+                spaceAfter=6
+            )
+
+            body_style = ParagraphStyle(
+                'ContractBody',
+                parent=styles['Normal'],
+                fontSize=11,
+                leading=14,
+                textColor=self.colors['text_dark'],
+                alignment=4,
+                spaceAfter=10
+            )
+
+            elements.append(Paragraph(school['name'], title_style))
+            elements.append(Paragraph(f"{school['district']} • {school['address']} • {school['phone']}", subtitle_style))
+
+            contract_title = Paragraph("SCHOOL EMPLOYMENT CONTRACT", title_style)
+            elements.append(contract_title)
+
+            summary_data = [
+                ["Employee", educator_data['full_name']],
+                ["Position", educator_data['job_title']],
+                ["Employee ID", educator_data['employee_id']],
+                ["Start Date", educator_data['hire_date'].strftime(USA_CONFIG['date_format'])],
+                ["Annual Salary", self.format_currency(educator_data['annual_salary'])],
+                ["Monthly Salary", self.format_currency(educator_data['monthly_salary'])],
+                ["School", school['name']]
+            ]
+
+            summary_table = Table(summary_data, colWidths=[1.6*inch, 4.4*inch])
+            summary_table.setStyle(TableStyle([
+                ('FONT', (0, 0), (-1, -1), 'Helvetica', 10),
+                ('FONT', (1, 0), (1, 0), 'Helvetica-Bold', 11),
+                ('BACKGROUND', (0, 0), (0, -1), self.colors['row_odd']),
+                ('TEXTCOLOR', (0, 0), (0, -1), self.colors['text_dark']),
+                ('TEXTCOLOR', (1, 0), (1, -1), self.colors['text_dark']),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('GRID', (0, 0), (-1, -1), 0.5, self.colors['border']),
+                ('PADDING', (0, 0), (-1, -1), 6),
+            ]))
+            elements.append(summary_table)
+            elements.append(Spacer(1, 14))
+
+            responsibilities = (
+                f"The employee agrees to perform the duties of {educator_data['job_title']} for {school['name']}, "
+                f"including classroom instruction, curriculum planning, student support, and participation in "
+                f"school improvement activities for {educator_data['subject_area']}."
+            )
+
+            compensation = (
+                f"The school will compensate the employee at an annual rate of {self.format_currency(educator_data['annual_salary'])} "
+                f"({self.format_currency(educator_data['monthly_salary'])} monthly) in accordance with district payroll schedules, "
+                "with eligibility for standard benefits consistent with school policy."
+            )
+
+            schedule = (
+                "The employee will adhere to the academic calendar and schedule established by the school district, "
+                "including required professional development days and parent engagement events."
+            )
+
+            compliance = (
+                "The employee shall maintain all required licensure, follow district policies and code of conduct, "
+                "and comply with federal and state education regulations."
+            )
+
+            termination = (
+                "Either party may terminate this agreement in accordance with district policy. The school may place the "
+                "employee on administrative leave or terminate employment for cause, including misconduct or failure to "
+                "maintain required certifications."
+            )
+
+            elements.append(Paragraph("POSITION & RESPONSIBILITIES", section_header))
+            elements.append(Paragraph(responsibilities, body_style))
+
+            elements.append(Paragraph("COMPENSATION & BENEFITS", section_header))
+            elements.append(Paragraph(compensation, body_style))
+
+            elements.append(Paragraph("SCHEDULE & ATTENDANCE", section_header))
+            elements.append(Paragraph(schedule, body_style))
+
+            elements.append(Paragraph("COMPLIANCE & CONDUCT", section_header))
+            elements.append(Paragraph(compliance, body_style))
+
+            elements.append(Paragraph("TERM & TERMINATION", section_header))
+            elements.append(Paragraph(termination, body_style))
+
+            elements.append(Spacer(1, 20))
+            elements.append(Paragraph("ACCEPTANCE & SIGNATURES", section_header))
+
+            signature_text = (
+                "By signing below, both parties acknowledge and agree to the terms of this employment contract and "
+                "confirm that the information provided is accurate."
+            )
+            elements.append(Paragraph(signature_text, body_style))
+
+            signature_table = Table([
+                ["____________________________", "____________________________"],
+                [f"{school['principal']}\nPrincipal", f"{educator_data['full_name']}\nEmployee"],
+                [datetime.now().strftime('%m/%d/%Y'), datetime.now().strftime('%m/%d/%Y')]
+            ], colWidths=[3*inch, 3*inch])
+            signature_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONT', (0, 1), (-1, 1), 'Helvetica', 10),
+                ('FONT', (0, 2), (-1, 2), 'Helvetica', 9),
+                ('TEXTCOLOR', (0, 0), (-1, -1), self.colors['text_dark']),
+                ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ]))
+            elements.append(signature_table)
+
+            footer_style = ParagraphStyle(
+                'ContractFooter',
+                parent=styles['Normal'],
+                fontSize=8,
+                textColor=self.colors['text_light'],
+                alignment=1,
+                spaceBefore=30
+            )
+
+            footer = Paragraph(
+                "OFFICIAL SCHOOL DOCUMENT • EMPLOYMENT CONTRACT • CONFIDENTIAL", footer_style
+            )
+            elements.append(footer)
+
+            doc.build(elements)
             return filename
-            
+
         except Exception as e:
-            logger.error(f"Failed to create ID badge: {e}")
+            logger.error(f"Failed to create employment contract: {e}")
             return None
     
     def create_pay_stub(self, educator_data):
@@ -548,10 +661,11 @@ class EducatorDocumentGenerator:
                 ["Job Title:", educator_data['job_title'], "Pay Date:", pay_date.strftime('%m/%d/%Y')],
                 ["Pay Period:", f"{pay_period_start.strftime('%m/%d/%Y')} - {pay_date.strftime('%m/%d/%Y')}", "Check #:", f"{random.randint(10000, 99999)}"]
             ]
-            
+
             info_table = Table(info_table_data, colWidths=[1.5*inch, 2*inch, 1.5*inch, 2*inch])
             info_table.setStyle(TableStyle([
                 ('FONT', (0, 0), (-1, -1), 'Helvetica', 10),
+                ('FONT', (1, 0), (1, 0), 'Helvetica-Bold', 11),
                 ('BACKGROUND', (0, 0), (0, -1), self.colors['row_odd']),
                 ('BACKGROUND', (2, 0), (2, -1), self.colors['row_odd']),
                 ('TEXTCOLOR', (0, 0), (-1, -1), self.colors['text_dark']),
@@ -704,7 +818,7 @@ class EducatorDocumentGenerator:
         print(f"📚 Schools: {len(self.schools)} available")
         print("📄 Documents per set:")
         print("   1. Official Employment Letter")
-        print("   2. Professional ID Badge")
+        print("   2. School Employment Contract")
         print("   3. Recent Pay Stub")
         print("✅ All documents include:")
         print("   • Full Name • Job Title • School Name")
@@ -720,10 +834,10 @@ class EducatorDocumentGenerator:
                 
                 # Generate all three documents
                 letter_file = self.create_employment_letter(educator_data)
-                id_file = self.create_id_badge(educator_data)
+                contract_file = self.create_employment_contract(educator_data)
                 paystub_file = self.create_pay_stub(educator_data)
-                
-                if letter_file and id_file and paystub_file:
+
+                if letter_file and contract_file and paystub_file:
                     self.save_educator(educator_data)
                     success += 1
                 
@@ -745,7 +859,7 @@ class EducatorDocumentGenerator:
         print(f"📄 Educator list: {self.employees_file}")
         print(f"📋 Documents generated per educator:")
         print(f"   • Official Employment Letter")
-        print(f"   • Professional ID Badge")
+        print(f"   • School Employment Contract")
         print(f"   • Recent Pay Stub")
         print("="*70)
 
@@ -760,7 +874,7 @@ def main():
     print("   • Current Dates • Official School Letterhead")
     print("📁 Three documents per educator:")
     print("   1. Official Employment Letter")
-    print("   2. Professional ID Badge")
+    print("   2. School Employment Contract")
     print("   3. Recent Pay Stub")
     print("="*70)
     
@@ -774,7 +888,7 @@ def main():
         print(f"School Type: {generator.selected_school_type}")
         print(f"Available Schools: {len(generator.schools)}")
         print(f"Document Set includes:")
-        print("   • Employment Letter • ID Badge • Pay Stub")
+        print("   • Employment Letter • Employment Contract • Pay Stub")
         print(f"{'='*60}")
         
         user_input = input("\nNumber of educators to generate (0 to exit): ").strip()
